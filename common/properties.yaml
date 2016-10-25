@@ -1,0 +1,26 @@
+caserver:
+
+        rootpath: "blockchain"
+        cadir: "CA"
+
+        # port the CA services are listening on
+        port: ":50051"
+
+        address: "10.9.22.88"
+
+
+security:
+    # Can be 256 or 384
+    # Must be the same as in core.yaml
+    level: 256
+
+    # Can be SHA2 or SHA3
+    # Must be the same as in core.yaml
+    hashAlgorithm: SHA3
+
+
+pki:
+          ca:
+                 subject:
+                         organization: RocBlockchain
+                         country: China

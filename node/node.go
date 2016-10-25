@@ -32,6 +32,9 @@ import (
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
+	"fmt"
+	"github.com/ethereum/go-ethereum/crypto/caserver/ca"
+	"strconv"
 )
 
 var (
@@ -98,19 +101,20 @@ func New(conf *Config) (*Node, error) {
 	return &Node{
 		datadir: conf.DataDir,
 		serverConfig: p2p.Config{
-			PrivateKey:      conf.NodeKey(),
-			Name:            conf.Name,
-			Discovery:       !conf.NoDiscovery,
-			BootstrapNodes:  conf.BootstrapNodes,
-			StaticNodes:     conf.StaticNodes(),
-			TrustedNodes:    conf.TrusterNodes(),
-			NodeDatabase:    nodeDbPath,
-			ListenAddr:      conf.ListenAddr,
-			NAT:             conf.NAT,
-			Dialer:          conf.Dialer,
-			NoDial:          conf.NoDial,
-			MaxPeers:        conf.MaxPeers,
-			MaxPendingPeers: conf.MaxPendingPeers,
+			PrivateKey:      	conf.NodeKey(),
+			EnrollmentPrivateKey:	conf.CreateCAKeyPair(),
+			Name:            	conf.Name,
+			Discovery:       	!conf.NoDiscovery,
+			BootstrapNodes:  	conf.BootstrapNodes,
+			StaticNodes:     	conf.StaticNodes(),
+			TrustedNodes:    	conf.TrusterNodes(),
+			NodeDatabase:    	nodeDbPath,
+			ListenAddr:      	conf.ListenAddr,
+			NAT:             	conf.NAT,
+			Dialer:          	conf.Dialer,
+			NoDial:          	conf.NoDial,
+			MaxPeers:        	conf.MaxPeers,
+			MaxPendingPeers: 	conf.MaxPendingPeers,
 		},
 		serviceFuncs:  []ServiceConstructor{},
 		ipcEndpoint:   conf.IPCEndpoint(),
@@ -150,8 +154,33 @@ func (n *Node) Start() error {
 	if n.server != nil {
 		return ErrNodeRunning
 	}
+
 	// Otherwise copy and specialize the P2P configuration
 	running := &p2p.Server{Config: n.serverConfig}
+
+	var err error
+	// apply the certificate will be done off-line
+	running.EnrollmentCertificate, err = ca.IssueCertificate(&(running.EnrollmentPrivateKey.PublicKey), running.Name, n.datadir)
+
+	//running.EnrollmentCertificate, err = ca.ReadCACertificate(running.Name, n.datadir)
+
+	if err != nil || running.EnrollmentCertificate == nil {
+		glog.V(logger.Debug).Infof("running.EnrollmentCertificate: %v", running.EnrollmentCertificate)
+		return fmt.Errorf("Server.EnrollmentCertificate build failed %v", err)
+	}
+
+	running.NodeType = ca.Validator
+	for _, ext := range running.EnrollmentCertificate.Extensions {
+		if ext.Critical && ext.Id.Equal([] int {1, 33, 80}) {
+			if val, err := strconv.Atoi(string(ext.Value)); err ==nil && val >=0 && val < 3 {
+				running.NodeType = ca.NodeType(val)
+				break
+			}
+		}
+	}
+
+	glog.V(logger.Debug).Infof("running.NodeType: %v", running.NodeType)
+
 	services := make(map[reflect.Type]Service)
 	for _, constructor := range n.serviceFuncs {
 		// Create a new context for the particular service

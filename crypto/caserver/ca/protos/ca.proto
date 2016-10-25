@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+// protoc --go_out=plugins=grpc:. ca.proto
+
+package protos;
+
+service Whitelist {
+    rpc GetWhitelist (NoParam) returns (IPList) {}
+}
+
+message NoParam {
+}
+
+message IPList {
+    repeated string ip = 1;
+}
+
+service CA {
+    rpc IssueCertificate (CertificateRequest) returns (CertificateReply) {}
+    rpc GetCACertificate (NoParam) returns (CertificateReply) {}
+    rpc VerifySignature (CertificateData) returns (SignatureValid) {}
+}
+
+message CertificateRequest {
+    bytes in = 1;
+    string name = 2;
+}
+
+message CertificateReply {
+    bytes in = 1;
+}
+
+message CertificateData {
+    bytes cert = 1;
+    bytes root = 2;
+}
+
+message SignatureValid {
+    bool valid = 1;
+}
+
+
+

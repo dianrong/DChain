@@ -29,6 +29,9 @@ import (
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/nat"
+
+	"crypto/x509"
+	"github.com/ethereum/go-ethereum/crypto/caserver/ca"
 )
 
 const (
@@ -58,6 +61,12 @@ var srvjslog = logger.NewJsonLogger()
 type Config struct {
 	// This field must be set to a valid secp256k1 private key.
 	PrivateKey *ecdsa.PrivateKey
+
+	EnrollmentPrivateKey *ecdsa.PrivateKey
+
+	EnrollmentCertificate *x509.Certificate
+
+	NodeType ca.NodeType
 
 	// MaxPeers is the maximum number of peers that can be
 	// connected. It must be greater than zero.
@@ -584,6 +593,9 @@ func (srv *Server) listenLoop() {
 				glog.V(logger.Debug).Infof("Read error: %v", err)
 				return
 			}
+
+			glog.V(logger.Debug).Infof("\n\nTest receive conn %v\n\n", fd.RemoteAddr())
+
 			break
 		}
 		fd = newMeteredConn(fd, true)
@@ -611,6 +623,14 @@ func (srv *Server) setupConn(fd net.Conn, flags connFlag, dialDest *discover.Nod
 		c.close(errServerStopped)
 		return
 	}
+
+	// Run the enrollment handshake.
+	if valid, err := c.doEnrollmentHandshake(srv.EnrollmentCertificate, dialDest); err != nil || !valid {
+		glog.V(logger.Debug).Infof("%v faild enrollment handshake: %v", c, err)
+		c.close(err)
+		return
+	}
+
 	// Run the encryption handshake.
 	var err error
 	if c.id, err = c.doEncHandshake(srv.PrivateKey, dialDest); err != nil {
