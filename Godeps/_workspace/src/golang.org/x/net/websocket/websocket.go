@@ -4,7 +4,7 @@
 
 // Package websocket implements a client and server for the WebSocket protocol
 // as specified in RFC 6455.
-package websocket
+package websocket // import "golang.org/x/net/websocket"
 
 import (
 	"bufio"
@@ -86,6 +86,9 @@ type Config struct {
 	// Additional header fields to be sent in WebSocket opening handshake.
 	Header http.Header
 
+	// Dialer used when opening websocket connections.
+	Dialer *net.Dialer
+
 	handshakeData map[string]string
 }
 
@@ -144,6 +147,8 @@ type frameHandler interface {
 }
 
 // Conn represents a WebSocket connection.
+//
+// Multiple goroutines may invoke methods on a Conn simultaneously.
 type Conn struct {
 	config  *Config
 	request *http.Request
@@ -207,9 +212,6 @@ func (ws *Conn) Write(msg []byte) (n int, err error) {
 	}
 	n, err = w.Write(msg)
 	w.Close()
-	if err != nil {
-		return n, err
-	}
 	return n, err
 }
 
