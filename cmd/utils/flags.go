@@ -22,11 +22,13 @@ import (
 	"io/ioutil"
 	"math"
 	"math/big"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ethereum/ethash"
 	"github.com/ethereum/go-ethereum/accounts"
@@ -34,6 +36,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto/caserver/ca"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
@@ -48,6 +51,7 @@ import (
 	"github.com/ethereum/go-ethereum/release"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/whisper"
+	"github.com/spf13/viper"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -76,6 +80,10 @@ OPTIONS:
 	{{end}}{{end}}
 `
 }
+
+const (
+	envPrefix = "BC_CONF"
+)
 
 // NewApp creates an app with sane defaults.
 func NewApp(version, usage string) *cli.App {
@@ -123,6 +131,10 @@ var (
 	DevModeFlag = cli.BoolFlag{
 		Name:  "dev",
 		Usage: "Developer mode: pre-configured private network with several debugging flags",
+	}
+	GenesisFileFlag = cli.StringFlag{
+		Name:  "genesis",
+		Usage: "Insert/overwrite the genesis block (JSON format)",
 	}
 	IdentityFlag = cli.StringFlag{
 		Name:  "identity",
@@ -537,6 +549,20 @@ func MakeWSRpcHost(ctx *cli.Context) string {
 	return ctx.GlobalString(WSListenAddrFlag.Name)
 }
 
+// MakeGenesisBlock loads up a genesis block from an input file specified in the
+// command line, or returns the empty string if none set.
+func MakeGenesisBlock(ctx *cli.Context) string {
+	genesis := ctx.GlobalString(GenesisFileFlag.Name)
+	if genesis == "" {
+		return ""
+	}
+	data, err := ioutil.ReadFile(genesis)
+	if err != nil {
+		Fatalf("Failed to load custom genesis file: %v", err)
+	}
+	return string(data)
+}
+
 // MakeDatabaseHandles raises out the number of allowed file handles per process
 // for Geth and returns half of the allowance to assign to the database.
 func MakeDatabaseHandles() int {
@@ -642,6 +668,19 @@ func MakeSystemNode(name, version string, relconf release.Config, extra []byte, 
 	if networks > 1 {
 		Fatalf("The %v flags are mutually exclusive", netFlags)
 	}
+	viper.SetEnvPrefix(envPrefix)
+	viper.AutomaticEnv()
+	replacer := strings.NewReplacer(".", "_")
+	viper.SetEnvKeyReplacer(replacer)
+	viper.SetConfigName("properties")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("./common/")
+
+	err := viper.ReadInConfig()
+	if err != nil {
+		Fatalf("Fatal error when reading config file: %s", err)
+	}
+
 	// Configure the node's service container
 	stackConf := &node.Config{
 		DataDir:         MustMakeDataDir(ctx),
@@ -665,9 +704,24 @@ func MakeSystemNode(name, version string, relconf release.Config, extra []byte, 
 	}
 	// Configure the Ethereum service
 	accman := MakeAccountManager(ctx)
+
+	// initialise new random number generator
+	rand := rand.New(rand.NewSource(time.Now().UnixNano()))
+	// get enabled jit flag
 	jitEnabled := ctx.GlobalBool(VMEnableJitFlag.Name)
+	// if the jit is not enabled enable it for 10 pct of the people
+	if !jitEnabled && rand.Float64() < 0.1 {
+		jitEnabled = true
+		glog.V(logger.Info).Infoln("You're one of the lucky few that will try out the JIT VM (random). If you get a consensus failure please be so kind to report this incident with the block hash that failed. You can switch to the regular VM by setting --jitvm=false")
+	}
+
+	if err := ca.Init(); err != nil {
+		return nil
+	}
+
 	ethConf := &eth.Config{
 		ChainConfig:             MustMakeChainConfig(ctx),
+		Genesis:                 MakeGenesisBlock(ctx),
 		FastSync:                ctx.GlobalBool(FastSyncFlag.Name),
 		BlockChainVersion:       ctx.GlobalInt(BlockchainVersionFlag.Name),
 		DatabaseCache:           ctx.GlobalInt(CacheFlag.Name),
@@ -700,13 +754,17 @@ func MakeSystemNode(name, version string, relconf release.Config, extra []byte, 
 		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
 			ethConf.NetworkId = 1
 		}
-		ethConf.Genesis = core.OlympicGenesisBlock()
+		if !ctx.GlobalIsSet(GenesisFileFlag.Name) {
+			ethConf.Genesis = core.OlympicGenesisBlock()
+		}
 
 	case ctx.GlobalBool(TestNetFlag.Name):
 		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
 			ethConf.NetworkId = 2
 		}
-		ethConf.Genesis = core.TestNetGenesisBlock()
+		if !ctx.GlobalIsSet(GenesisFileFlag.Name) {
+			ethConf.Genesis = core.TestNetGenesisBlock()
+		}
 		state.StartingNonce = 1048576 // (2**20)
 
 	case ctx.GlobalBool(DevModeFlag.Name):
@@ -721,7 +779,10 @@ func MakeSystemNode(name, version string, relconf release.Config, extra []byte, 
 			stackConf.ListenAddr = ":0"
 		}
 		// Override the Ethereum protocol configs
-		ethConf.Genesis = core.OlympicGenesisBlock()
+		if !ctx.GlobalIsSet(GenesisFileFlag.Name) {
+			ethConf.Genesis = core.OlympicGenesisBlock()
+		}
+
 		if !ctx.GlobalIsSet(GasPriceFlag.Name) {
 			ethConf.GasPrice = new(big.Int)
 		}
@@ -777,6 +838,7 @@ func MustMakeChainConfig(ctx *cli.Context) *core.ChainConfig {
 }
 
 // MustMakeChainConfigFromDb reads the chain configuration from the given database.
+/*
 func MustMakeChainConfigFromDb(ctx *cli.Context, db ethdb.Database) *core.ChainConfig {
 	// If the chain is already initialized, use any existing chain configs
 	config := new(core.ChainConfig)
@@ -841,6 +903,29 @@ func MustMakeChainConfigFromDb(ctx *cli.Context, db ethdb.Database) *core.ChainC
 		glog.V(logger.Warn).Info(separator)
 	}
 	return config
+}
+*/
+
+// MustMakeChainConfigFromDb reads the chain configuration from the given database.
+func MustMakeChainConfigFromDb(ctx *cli.Context, db ethdb.Database) *core.ChainConfig {
+	genesis := core.GetBlock(db, core.GetCanonicalHash(db, 0))
+
+	if genesis != nil {
+		// Existing genesis block, use stored config if available.
+		storedConfig, err := core.GetChainConfig(db, genesis.Hash())
+		if err == nil {
+			return storedConfig
+		} else if err != core.ChainConfigNotFoundErr {
+			Fatalf("Could not make chain configuration: %v", err)
+		}
+	}
+	var homesteadBlockNo *big.Int
+	if ctx.GlobalBool(TestNetFlag.Name) {
+		homesteadBlockNo = params.TestNetHomesteadBlock
+	} else {
+		homesteadBlockNo = params.MainNetHomesteadBlock
+	}
+	return &core.ChainConfig{HomesteadBlock: homesteadBlockNo}
 }
 
 // MakeChainDatabase open an LevelDB using the flags passed to the client and will hard crash if it fails.
