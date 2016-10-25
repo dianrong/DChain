@@ -33,6 +33,7 @@ import (
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/nat"
+	"github.com/ethereum/go-ethereum/crypto/caserver/ca"
 )
 
 var (
@@ -229,6 +230,16 @@ func (c *Config) NodeKey() *ecdsa.PrivateKey {
 		glog.V(logger.Error).Infof("Failed to persist node key: %v", err)
 	}
 	return key
+}
+
+func (c *Config) CreateCAKeyPair() *ecdsa.PrivateKey {
+	if c.DataDir == "" {
+		glog.Fatalf("Failed to generate CA key")
+		return nil
+	}
+
+	keyFile := filepath.Join(c.DataDir, "cakeystore")
+	return ca.CreateCAKeyPair(c.Name, keyFile)
 }
 
 // StaticNodes returns a list of node enode URLs configured as static nodes.

@@ -29,7 +29,6 @@ import (
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/nat"
-
 	"crypto/x509"
 	"github.com/ethereum/go-ethereum/crypto/caserver/ca"
 )
@@ -184,6 +183,9 @@ type transport interface {
 	// The two handshakes.
 	doEncHandshake(prv *ecdsa.PrivateKey, dialDest *discover.Node) (discover.NodeID, error)
 	doProtoHandshake(our *protoHandshake) (*protoHandshake, error)
+
+	doEnrollmentHandshake(cert *x509.Certificate, dial *discover.Node) (bool, error)
+
 	// The MsgReadWriter can only be used after the encryption
 	// handshake has completed. The code uses conn.id to track this
 	// by setting it to a non-nil value after the encryption handshake.
@@ -325,6 +327,10 @@ func (srv *Server) Start() (err error) {
 	if srv.PrivateKey == nil {
 		return fmt.Errorf("Server.PrivateKey must be set to a non-nil key")
 	}
+	if srv.EnrollmentPrivateKey == nil {
+		return fmt.Errorf("Server.EnrollmentPrivateKey must be set to a non-nil key")
+	}
+
 	if srv.newTransport == nil {
 		srv.newTransport = newRLPX
 	}
@@ -576,6 +582,7 @@ func (srv *Server) listenLoop() {
 		slots <- struct{}{}
 	}
 
+	// test
 	for {
 		// Wait for a handshake slot before accepting.
 		<-slots

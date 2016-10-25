@@ -40,6 +40,13 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/rlp"
+	"bufio"
+	"github.com/ethereum/go-ethereum/crypto/caserver/ca"
+	"crypto/x509"
+	"encoding/pem"
+	"strings"
+	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/logger"
 )
 
 const (
@@ -109,7 +116,7 @@ func (t *rlpx) close(err error) {
 	t.fd.Close()
 }
 
-// doEncHandshake runs the protocol handshake using authenticated
+// doProtoHandshake runs the protocol handshake using authenticated
 // messages. the protocol handshake is the first authenticated message
 // and also verifies whether the encryption handshake 'worked' and the
 // remote side actually provided the right public key.
@@ -177,6 +184,17 @@ func (t *rlpx) doEncHandshake(prv *ecdsa.PrivateKey, dial *discover.Node) (disco
 	t.rw = newRLPXFrameRW(t.fd, sec)
 	t.wmu.Unlock()
 	return sec.RemoteID, nil
+}
+
+func (t *rlpx) doEnrollmentHandshake(cert *x509.Certificate, dial *discover.Node) (bool, error) {
+
+	if dial == nil {
+		return receiverEnrollmentHandshake(t.fd)
+	} else {
+		return initiatorEnrollmentHandshake(t.fd, cert)
+	}
+
+	return true, nil
 }
 
 // encHandshake contains the state of the encryption handshake.
@@ -259,6 +277,57 @@ func (h *encHandshake) secrets(auth, authResp []byte) (secrets, error) {
 // of key agreement between the local and remote static node key.
 func (h *encHandshake) staticSharedSecret(prv *ecdsa.PrivateKey) ([]byte, error) {
 	return ecies.ImportECDSA(prv).GenerateShared(h.remotePub, sskLen, sskLen)
+}
+
+func initiatorEnrollmentHandshake(conn io.ReadWriter, cert *x509.Certificate) (valid bool, err error) {
+
+	raw := cert.Raw
+	cooked := pem.EncodeToMemory(
+		&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: raw,
+		})
+
+	if _, err = conn.Write([]byte(cooked)); err != nil {
+		glog.V(logger.Debug).Infof("could not send certificate: %v", err)
+		return false, fmt.Errorf("could not send certificate: %v", err)
+	}
+
+	message, err := bufio.NewReader(conn).ReadString('\n')
+	if err != nil {
+		glog.V(logger.Debug).Infof("certificate response: msg %v;  err %v", message, err)
+		return false, fmt.Errorf("could not get certificate response: %v", err)
+	}
+
+	glog.V(logger.Debug).Infof("certificate response: msg %v", message)
+	valid = strings.Compare(message, "pass\n") == 0
+	return valid, err
+}
+
+func receiverEnrollmentHandshake(conn io.ReadWriter) (valid bool, err error) {
+	message := make([]byte, 1000)
+	n, err := bufio.NewReader(conn).Read([]byte(message))
+	if err != nil {
+		return false, fmt.Errorf("could not readfull: %v", err)
+	}
+
+	receiverCert := message[0:n]
+
+	root, err := ca.GetCACertificate()
+	if err != nil {
+		glog.V(logger.Debug).Infof("could not get ca certificate: root %v;  receiverCert %v; err %v", root, receiverCert, err)
+		return false, fmt.Errorf("could not get ca certificate: %v", err)
+	}
+	err = ca.VerifySignature(receiverCert, root)
+	valid = err == nil
+
+	if valid {
+		conn.Write([]byte("pass\n"))
+	}else {
+		conn.Write([]byte("failed\n"))
+	}
+
+	return valid, err
 }
 
 // initiatorEncHandshake negotiates a session token on conn.
