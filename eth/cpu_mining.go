@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/crypto/caserver/ca"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 )
@@ -29,6 +30,12 @@ import (
 const disabledInfo = "Set GO_OPENCL and re-build to enable."
 
 func (s *Ethereum) StartMining(threads int, gpus string) error {
+	if s.nodetype != ca.Validator && s.nodetype != ca.Admin {
+		err := fmt.Errorf("Cannot start mining without permission")
+		glog.V(logger.Error).Infoln(err)
+		return err
+	}
+
 	eb, err := s.Etherbase()
 	if err != nil {
 		err = fmt.Errorf("Cannot start mining without etherbase address: %v", err)

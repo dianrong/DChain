@@ -38,6 +38,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/crypto/caserver/ca"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/filters"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -107,6 +108,7 @@ type Ethereum struct {
 	chainConfig *core.ChainConfig
 	// Channel for shutting down the ethereum
 	shutdownChan chan bool
+	nodetype     ca.NodeType
 
 	// DB interfaces
 	chainDb ethdb.Database // Block chain database
@@ -203,6 +205,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 	eth := &Ethereum{
 		shutdownChan:            make(chan bool),
 		chainDb:                 chainDb,
+		nodetype:                ctx.NodeType,
 		dappDb:                  dappDb,
 		eventMux:                ctx.EventMux,
 		accountManager:          config.AccountManager,
@@ -273,9 +276,11 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.FastSync, config.NetworkId, eth.eventMux, eth.txPool, eth.pow, eth.blockchain, chainDb, ctx.NodeType); err != nil {
 		return nil, err
 	}
-	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.pow)
-	eth.miner.SetGasPrice(config.GasPrice)
-	eth.miner.SetExtra(config.ExtraData)
+	if ctx.NodeType == ca.Validator || ctx.NodeType == ca.Admin {
+		eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.pow)
+		eth.miner.SetGasPrice(config.GasPrice)
+		eth.miner.SetExtra(config.ExtraData)
+	}
 
 	return eth, nil
 }
@@ -379,11 +384,24 @@ func (s *Ethereum) Etherbase() (eb common.Address, err error) {
 // set in js console via admin interface or wrapper from cli flags
 func (self *Ethereum) SetEtherbase(etherbase common.Address) {
 	self.etherbase = etherbase
-	self.miner.SetEtherbase(etherbase)
+	if self.nodetype == ca.Validator || self.nodetype == ca.Admin {
+		self.miner.SetEtherbase(etherbase)
+	}
 }
 
-func (s *Ethereum) StopMining()         { s.miner.Stop() }
-func (s *Ethereum) IsMining() bool      { return s.miner.Mining() }
+func (s *Ethereum) IsMining() bool {
+	if s.nodetype == ca.Validator || s.nodetype == ca.Admin {
+		return s.miner.Mining()
+	}
+	return false
+}
+
+func (s *Ethereum) StopMining() {
+	if s.nodetype == ca.Validator || s.nodetype == ca.Admin {
+		s.miner.Stop()
+	}
+}
+
 func (s *Ethereum) Miner() *miner.Miner { return s.miner }
 
 func (s *Ethereum) AccountManager() *accounts.Manager  { return s.accountManager }
@@ -420,7 +438,10 @@ func (s *Ethereum) Stop() error {
 	s.blockchain.Stop()
 	s.protocolManager.Stop()
 	s.txPool.Stop()
-	s.miner.Stop()
+
+	if s.nodetype == ca.Validator || s.nodetype == ca.Admin {
+		s.miner.Stop()
+	}
 	s.eventMux.Stop()
 
 	s.StopAutoDAG()
