@@ -25,11 +25,13 @@ import (
 type NodeType int32
 
 const (
-	Peer NodeType = 0
+	Client NodeType = 0
 
-	Validator NodeType = 1
+	Peer NodeType = 1
 
-	Admin NodeType = 2
+	Validator NodeType = 2
+
+	Admin NodeType = 3
 )
 
 // Hash is the common interface implemented by all hash functions.
@@ -279,7 +281,7 @@ func NewCA(name string, initTables TableInitializer) *CA {
 	return ca
 }
 
-func (ca *CA) IssueCertificate(in []byte, name string) ([]byte, error) {
+func (ca *CA) IssueCertificate(in []byte, name string, nodetype NodeType) ([]byte, error) {
 	raw, err := ca.readCACertificate(name)
 
 	if err != nil {
@@ -295,7 +297,7 @@ func (ca *CA) IssueCertificate(in []byte, name string) ([]byte, error) {
 		}
 
 		pubkey := pub.(*ecdsa.PublicKey)
-		raw = ca.createCACertificate(name, (pubkey), Validator)
+		raw = ca.createCACertificate(name, (pubkey), nodetype)
 	}
 
 	cooked := pem.EncodeToMemory(
