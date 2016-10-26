@@ -34,7 +34,6 @@ import (
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
-	"strconv"
 )
 
 var (
@@ -172,7 +171,8 @@ func (n *Node) Start() error {
 	running.NodeType = ca.Validator
 	for _, ext := range running.EnrollmentCertificate.Extensions {
 		if ext.Critical && ext.Id.Equal([]int{1, 33, 80}) {
-			if val, err := strconv.Atoi(string(ext.Value)); err == nil && val >= 0 && val < 3 {
+			val := int32(uint8(ext.Value[0]))
+			if err == nil && val >= 0 && val <= 3 {
 				running.NodeType = ca.NodeType(val)
 				break
 			}
@@ -180,6 +180,7 @@ func (n *Node) Start() error {
 	}
 
 	glog.V(logger.Debug).Infof("running.NodeType: %v", running.NodeType)
+	fmt.Println("running.NodeType: ", running.NodeType)
 
 	services := make(map[reflect.Type]Service)
 	for _, constructor := range n.serviceFuncs {

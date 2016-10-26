@@ -288,7 +288,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 // APIs returns the collection of RPC services the ethereum package offers.
 // NOTE, some of these services probably need to be moved to somewhere else.
 func (s *Ethereum) APIs() []rpc.API {
-	return []rpc.API{
+	var apis []rpc.API = []rpc.API{
 		{
 			Namespace: "eth",
 			Version:   "1.0",
@@ -313,11 +313,6 @@ func (s *Ethereum) APIs() []rpc.API {
 			Namespace: "eth",
 			Version:   "1.0",
 			Service:   NewPublicTransactionPoolAPI(s),
-			Public:    true,
-		}, {
-			Namespace: "eth",
-			Version:   "1.0",
-			Service:   NewPublicMinerAPI(s),
 			Public:    true,
 		}, {
 			Namespace: "eth",
@@ -363,6 +358,17 @@ func (s *Ethereum) APIs() []rpc.API {
 			Service:   ethreg.NewPrivateRegistarAPI(s.chainConfig, s.blockchain, s.chainDb, s.txPool, s.accountManager),
 		},
 	}
+
+	if s.nodetype == ca.Validator || s.nodetype == ca.Admin {
+		apis = append(apis, rpc.API{
+			Namespace: "eth",
+			Version:   "1.0",
+			Service:   NewPublicMinerAPI(s),
+			Public:    true,
+		})
+	}
+
+	return apis
 }
 
 func (s *Ethereum) ResetWithGenesisBlock(gb *types.Block) {
