@@ -26,14 +26,14 @@ import (
 	"sync"
 	"syscall"
 
+	"fmt"
+	"github.com/ethereum/go-ethereum/crypto/caserver/ca"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/internal/debug"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
-	"fmt"
-	"github.com/ethereum/go-ethereum/crypto/caserver/ca"
 	"strconv"
 )
 
@@ -101,20 +101,20 @@ func New(conf *Config) (*Node, error) {
 	return &Node{
 		datadir: conf.DataDir,
 		serverConfig: p2p.Config{
-			PrivateKey:      	conf.NodeKey(),
-			EnrollmentPrivateKey:	conf.CreateCAKeyPair(),
-			Name:            	conf.Name,
-			Discovery:       	!conf.NoDiscovery,
-			BootstrapNodes:  	conf.BootstrapNodes,
-			StaticNodes:     	conf.StaticNodes(),
-			TrustedNodes:    	conf.TrusterNodes(),
-			NodeDatabase:    	nodeDbPath,
-			ListenAddr:      	conf.ListenAddr,
-			NAT:             	conf.NAT,
-			Dialer:          	conf.Dialer,
-			NoDial:          	conf.NoDial,
-			MaxPeers:        	conf.MaxPeers,
-			MaxPendingPeers: 	conf.MaxPendingPeers,
+			PrivateKey:           conf.NodeKey(),
+			EnrollmentPrivateKey: conf.CreateCAKeyPair(),
+			Name:                 conf.Name,
+			Discovery:            !conf.NoDiscovery,
+			BootstrapNodes:       conf.BootstrapNodes,
+			StaticNodes:          conf.StaticNodes(),
+			TrustedNodes:         conf.TrusterNodes(),
+			NodeDatabase:         nodeDbPath,
+			ListenAddr:           conf.ListenAddr,
+			NAT:                  conf.NAT,
+			Dialer:               conf.Dialer,
+			NoDial:               conf.NoDial,
+			MaxPeers:             conf.MaxPeers,
+			MaxPendingPeers:      conf.MaxPendingPeers,
 		},
 		serviceFuncs:  []ServiceConstructor{},
 		ipcEndpoint:   conf.IPCEndpoint(),
@@ -171,8 +171,8 @@ func (n *Node) Start() error {
 
 	running.NodeType = ca.Validator
 	for _, ext := range running.EnrollmentCertificate.Extensions {
-		if ext.Critical && ext.Id.Equal([] int {1, 33, 80}) {
-			if val, err := strconv.Atoi(string(ext.Value)); err ==nil && val >=0 && val < 3 {
+		if ext.Critical && ext.Id.Equal([]int{1, 33, 80}) {
+			if val, err := strconv.Atoi(string(ext.Value)); err == nil && val >= 0 && val < 3 {
 				running.NodeType = ca.NodeType(val)
 				break
 			}
@@ -188,6 +188,7 @@ func (n *Node) Start() error {
 			datadir:  n.datadir,
 			services: make(map[reflect.Type]Service),
 			EventMux: n.eventmux,
+			NodeType: running.NodeType,
 		}
 		for kind, s := range services { // copy needed for threaded access
 			ctx.services[kind] = s

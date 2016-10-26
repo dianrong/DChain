@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"reflect"
 
+	"github.com/ethereum/go-ethereum/crypto/caserver/ca"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -33,6 +34,7 @@ type ServiceContext struct {
 	datadir  string                   // Data directory for protocol persistence
 	services map[reflect.Type]Service // Index of the already constructed services
 	EventMux *event.TypeMux           // Event multiplexer used for decoupled notifications
+	NodeType ca.NodeType
 }
 
 // OpenDatabase opens an existing database with the given name (or creates one

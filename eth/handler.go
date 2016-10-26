@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto/caserver/ca"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/fetcher"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -60,6 +61,7 @@ func errResp(code errCode, format string, v ...interface{}) error {
 
 type ProtocolManager struct {
 	networkId int
+	nodeType  ca.NodeType
 
 	fastSync uint32 // Flag whether fast sync is enabled (gets disabled if we already have blocks)
 	synced   uint32 // Flag whether we're considered synchronised (enables transaction processing)
@@ -94,10 +96,11 @@ type ProtocolManager struct {
 
 // NewProtocolManager returns a new ethereum sub protocol manager. The Ethereum sub protocol manages peers capable
 // with the ethereum network.
-func NewProtocolManager(config *core.ChainConfig, fastSync bool, networkId int, mux *event.TypeMux, txpool txPool, pow pow.PoW, blockchain *core.BlockChain, chaindb ethdb.Database) (*ProtocolManager, error) {
+func NewProtocolManager(config *core.ChainConfig, fastSync bool, networkId int, mux *event.TypeMux, txpool txPool, pow pow.PoW, blockchain *core.BlockChain, chaindb ethdb.Database, nodetype ca.NodeType) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
 		networkId:   networkId,
+		nodeType:    nodetype,
 		eventMux:    mux,
 		txpool:      txpool,
 		blockchain:  blockchain,
@@ -210,11 +213,15 @@ func (pm *ProtocolManager) removePeer(id string) {
 
 func (pm *ProtocolManager) Start() {
 	// broadcast transactions
-	pm.txSub = pm.eventMux.Subscribe(core.TxPreEvent{})
-	go pm.txBroadcastLoop()
+	if pm.nodeType != ca.Client {
+		pm.txSub = pm.eventMux.Subscribe(core.TxPreEvent{})
+		go pm.txBroadcastLoop()
+	}
 	// broadcast mined blocks
-	pm.minedBlockSub = pm.eventMux.Subscribe(core.NewMinedBlockEvent{})
-	go pm.minedBroadcastLoop()
+	if pm.nodeType == ca.Validator || pm.nodeType == ca.Admin {
+		pm.minedBlockSub = pm.eventMux.Subscribe(core.NewMinedBlockEvent{})
+		go pm.minedBroadcastLoop()
+	}
 
 	// start sync handlers
 	go pm.syncer()
@@ -224,8 +231,12 @@ func (pm *ProtocolManager) Start() {
 func (pm *ProtocolManager) Stop() {
 	glog.V(logger.Info).Infoln("Stopping ethereum protocol handler...")
 
-	pm.txSub.Unsubscribe()         // quits txBroadcastLoop
-	pm.minedBlockSub.Unsubscribe() // quits blockBroadcastLoop
+	if pm.nodeType != ca.Client {
+		pm.txSub.Unsubscribe() // quits txBroadcastLoop
+	}
+	if pm.nodeType == ca.Validator || pm.nodeType == ca.Admin {
+		pm.minedBlockSub.Unsubscribe() // quits blockBroadcastLoop
+	}
 
 	// Quit the sync loop.
 	// After this send has completed, no new peers will be accepted.
