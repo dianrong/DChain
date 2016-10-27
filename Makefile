@@ -17,6 +17,11 @@ geth:
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/geth\" to launch geth."
 
+caserver:
+	build/env.sh go run build/ci.go install ./crypto/caserver
+	@echo "Done building."
+	@echo "Run \"$(GOBIN)/caserver to start the caserver."
+
 evm:
 	build/env.sh go run build/ci.go install ./cmd/evm
 	@echo "Done building."
