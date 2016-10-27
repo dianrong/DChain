@@ -6,7 +6,7 @@ caserver:
         # port the CA services are listening on
         port: ":50051"
 
-        address: "10.9.22.46"
+        address: "10.9.22.88"
 
 
 security:
