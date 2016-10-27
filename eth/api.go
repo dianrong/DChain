@@ -152,6 +152,10 @@ func (s *PublicEthereumAPI) ProtocolVersion() *rpc.HexNumber {
 
 // Hashrate returns the POW hashrate
 func (s *PublicEthereumAPI) Hashrate() *rpc.HexNumber {
+	if s.e.nodetype == ca.Client || s.e.nodetype == ca.Peer {
+		return nil
+	}
+
 	return rpc.NewHexNumber(s.e.Miner().HashRate())
 }
 

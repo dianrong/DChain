@@ -31,3 +31,6 @@ Godeps/_workspace/bin
 # travis
 profile.tmp
 profile.cov
+
+.idea/
+go-ethereum.iml
