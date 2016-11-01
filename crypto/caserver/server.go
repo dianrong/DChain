@@ -84,6 +84,7 @@ func main() {
 	viper.SetEnvKeyReplacer(replacer)
 	viper.SetConfigName("properties")
 	viper.SetConfigType("yaml")
+	viper.AddConfigPath("./common/")
 	viper.AddConfigPath("../../common/")
 
 	err := viper.ReadInConfig()
