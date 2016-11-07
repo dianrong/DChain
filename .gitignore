@@ -16,6 +16,11 @@
 Godeps/_workspace/pkg
 Godeps/_workspace/bin
 
+
+./deploy/tmp
+./deploy/tmp/*
+./build/blockchain*.tar.gz
+
 #*
 .#*
 *#

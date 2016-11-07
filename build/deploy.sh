@@ -1,52 +1,5 @@
 #!/usr/bin/env bash
 
-# @param 1: binary dirname
-# @param 2: destination host login username
-# @param 3: dest host ip
-function setupEnv {
-    local dir=$1
-    local user=$2
-    local ip=$3
-    echo "setting up enviroment, 1. make ethereum home, 2, copy settings file, 3, copy genesis.txt"
-
-    ssh $user'@'$ip 'mkdir -p ~/blockchain/eth/data/keystore'
-    ssh $user'@'$ip 'mkdir -p ~/blockchain/common'
-    ssh $user'@'$ip 'mkdir -p ~/blockchain/bin'
-    ssh $user'@'$ip 'mkdir -p ~/blockchain/scripts'
-
-    echo "dir is $dir"
-
-    echo "copy genesis and config file to dst host"
-    local dstConfigDir=`printf "%s@%s:~/blockchain/common" "$user" "$ip"`
-    scp $dir/../common/properties.yaml $dstConfigDir
-    scp $dir/deploy/genesis.txt $dstConfigDir
-
-    echo "copy keystore to dst host"
-    local dstEthKeyDir=`printf "%s@%s:~/blockchain/eth/data/keystore" "$user" "$ip"`
-    scp $dir/deploy/keystore/* $dstEthKeyDir
-
-    echo "copy scripts to dst host"
-    local dstScriptsDir=`printf "%s@%s:~/blockchain/scripts" "$user" "$ip"`
-    scp $dir/deploy/runGeth.sh $dstScriptsDir
-    scp $dir/deploy/runCaServer.sh $dstScriptsDir
-}
-
-# $1: the dir of this file
-# $2: target file to be copied
-# $3: dest host username
-# $4: dest host ip
-function copyBin2DstHost {
-    local dir=$1
-    local exefile=$2 
-    local user=$3
-    local ip=$4
-    echo "user is $user, ip is $ip"
-    local targetURI=`printf "%s@%s:~/blockchain/bin" "$user" "$ip"`
-    echo "copying executables $exefile to target place $targetURI"
-    #ssh $user'@'$ip 'mkdir -p ~/blockchain'
-    scp $dir/bin/$exefile $targetURI
-}
-
 function runBin {
     local user=$1
     local ip=$2
@@ -63,6 +16,58 @@ function Usage {
     echo "Before using it, make sure the target machine can be logged on via ssh without password"
 }
 
+
+# $1: base dir
+function setupLocalEnv() {
+    local dir=$1
+    local BLOCKCHAINDIR=$2
+    for tdir in bin scripts common eth;do
+        echo "creating dir $BLOCKCHAINDIR/$tdir"
+        mkdir -p $BLOCKCHAINDIR/$tdir
+    done
+
+    mkdir -p $BLOCKCHAINDIR/eth/data/keystore
+
+    echo "copy geth and caserver"
+    cp $dir/bin/geth $BLOCKCHAINDIR/bin/
+    cp $dir/bin/caserver  $BLOCKCHAINDIR/bin/
+
+    echo "copy keystore files"
+    scp $dir/deploy/keystore/* $BLOCKCHAINDIR/eth/data/keystore/
+
+    echo "copy ca configuration file"
+    cp $dir/../common/properties.yaml $BLOCKCHAINDIR/common/
+    cp $dir/deploy/genesis.txt $BLOCKCHAINDIR/common/
+
+    echo "copying scripts"
+    cp $dir/deploy/runGeth.sh $BLOCKCHAINDIR/scripts/
+    cp $dir/deploy/runCaServer.sh $BLOCKCHAINDIR/scripts/
+}
+
+
+# $1 target dir
+# $2 username
+# $3 ip
+function copy2Remote() {
+    local dir=$1
+    local user=$2
+    local ip=$3
+
+    scp -rp $dir $user@$ip:~/
+}
+
+# $1 the dir to be archived
+# $2 the archived file name
+function createTar() {
+    local dir=$1
+    local tarName=$2
+    cd $dir/..
+    tar czf $tarName blockchain
+    cd -
+    mv $dir/../$tarName ./
+}
+
+
 if [ $# -lt 2 ];then
     echo "Wrong usage, This script take 2 arguments"
     Usage
@@ -71,9 +76,17 @@ else
     Usage
 fi
 
+currentDate=`date +"%Y%m%d_%H%M%S"`
+currentDir=`dirname $0`
+blockchainDir=$currentDir/deploy/tmp/$currentDate/blockchain
+echo "current dir is $currentDir, bc dir is $blockchainDir"
+setupLocalEnv $currentDir $blockchainDir
+createTar $blockchainDir blockchain_$currentDate_`uname`.tar.gz
+copy2Remote $blockchainDir $1 $2
 
-setupEnv `dirname $0` $1 $2
-copyBin2DstHost `dirname $0` geth $1 $2
-copyBin2DstHost `dirname $0` caserver $1 $2
+echo "Finished setting up local and remote enviroment"
+
+
 runBin $1 $2 "runCaServer.sh"
+
 runBin $1 $2 "runGeth.sh"
