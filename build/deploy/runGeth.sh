@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-ScriptsHome=`basedir $0`
+ScriptsHome=`dirname $0`
 EthereumHome=$ScriptsHome/../eth
 echo "assume geth is placed under ~/blockchain/bin, Ethereum home is  $EthereumHome"
 cd $ScriptsHome/..
