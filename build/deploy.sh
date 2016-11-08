@@ -26,22 +26,24 @@ function setupLocalEnv() {
         mkdir -p $BLOCKCHAINDIR/$tdir
     done
 
+    echo "--->STEP1: Setting up local envrioment"
     mkdir -p $BLOCKCHAINDIR/eth/data/keystore
 
-    echo "copy geth and caserver"
+    echo "...copy geth and caserver"
     cp $dir/bin/geth $BLOCKCHAINDIR/bin/
     cp $dir/bin/caserver  $BLOCKCHAINDIR/bin/
 
-    echo "copy keystore files"
+    echo "...copy keystore files"
     scp $dir/deploy/keystore/* $BLOCKCHAINDIR/eth/data/keystore/
 
-    echo "copy ca configuration file"
+    echo "...copy ca configuration file"
     cp $dir/../common/properties.yaml $BLOCKCHAINDIR/common/
     cp $dir/deploy/genesis.txt $BLOCKCHAINDIR/common/
 
-    echo "copying scripts"
+    echo "...copying scripts"
     cp $dir/deploy/runGeth.sh $BLOCKCHAINDIR/scripts/
     cp $dir/deploy/runCaServer.sh $BLOCKCHAINDIR/scripts/
+    echo "<---Finished setting up local envrioment"
 }
 
 
@@ -53,7 +55,9 @@ function copy2Remote() {
     local user=$2
     local ip=$3
 
+    echo "---> STEP: Setting up remote envrioment"
     scp -rp $dir $user@$ip:~/
+    echo "<--- Finished Setting up remote enviroment"
 }
 
 # $1 the dir to be archived
@@ -61,19 +65,20 @@ function copy2Remote() {
 function createTar() {
     local dir=$1
     local tarName=$2
+    echo "---> STEP: Creating archived file"
+    echo "tarname is $tarName"
     cd $dir/..
     tar czf $tarName blockchain*
     cd -
     mv $dir/../$tarName ./
+    echo "<--- STEP: Finished achiving file"
 }
 
-
-if [ $# -lt 2 ];then
-    echo "Wrong usage, This script take 2 arguments"
-    Usage
-    exit 1
-else
-    Usage
+if [ $# -ge 1 ];then
+    if [ $1 == "-h" ];then
+        Usage
+        exit 0
+    fi
 fi
 
 currentDate=`date +"%Y%m%d_%H%M%S"`
@@ -81,12 +86,16 @@ currentDir=`dirname $0`
 blockchainDir=$currentDir/deploy/tmp/$currentDate/blockchain
 echo "current dir is $currentDir, bc dir is $blockchainDir"
 setupLocalEnv $currentDir $blockchainDir
-createTar $blockchainDir blockchain_$currentDate_`uname`.tar.gz
+createTar $blockchainDir blockchain_${currentDate}_`uname`.tar.gz
+
+if [ $# -lt 2 ];then
+    echo "If you need to deploy this to a remote host, two extra argument required"
+    exit 1
+fi
+
 copy2Remote $blockchainDir $1 $2
-
-echo "Finished setting up local and remote enviroment"
-
 
 runBin $1 $2 "runCaServer.sh"
 
 runBin $1 $2 "runGeth.sh"
+
