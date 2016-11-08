@@ -62,7 +62,7 @@ function createTar() {
     local dir=$1
     local tarName=$2
     cd $dir/..
-    tar czf $tarName blockchain
+    tar czf $tarName blockchain*
     cd -
     mv $dir/../$tarName ./
 }
