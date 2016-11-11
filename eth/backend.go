@@ -83,6 +83,7 @@ type Config struct {
 	PowTest   bool
 	PowShared bool
 	ExtraData []byte
+	ConfigHash common.Hash
 
 	AccountManager *accounts.Manager
 	Etherbase      common.Address

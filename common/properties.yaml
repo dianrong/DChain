@@ -6,7 +6,7 @@ caserver:
         # port the CA services are listening on
         port: ":50051"
 
-        address: "10.9.22.88"
+        address: "10.9.22.187"
 
 
 security:
@@ -24,3 +24,9 @@ pki:
                  subject:
                          organization: RocBlockchain
                          country: China
+
+
+consensus:
+
+          algorithm: POW
+

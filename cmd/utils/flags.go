@@ -681,6 +681,14 @@ func MakeSystemNode(name, version string, relconf release.Config, extra []byte, 
 		Fatalf("Fatal error when reading config file: %s", err)
 	}
 
+	config := ""
+	keys := viper.AllKeys()
+	for _, key := range keys {
+		config += key
+		config += viper.GetString(key)
+	}
+	configHash := common.BytesToHash([]byte(config))
+
 	// Configure the node's service container
 	stackConf := &node.Config{
 		DataDir:         MustMakeDataDir(ctx),
@@ -722,6 +730,7 @@ func MakeSystemNode(name, version string, relconf release.Config, extra []byte, 
 	ethConf := &eth.Config{
 		ChainConfig:             MustMakeChainConfig(ctx),
 		Genesis:                 MakeGenesisBlock(ctx),
+		ConfigHash:		 configHash,
 		FastSync:                ctx.GlobalBool(FastSyncFlag.Name),
 		BlockChainVersion:       ctx.GlobalInt(BlockchainVersionFlag.Name),
 		DatabaseCache:           ctx.GlobalInt(CacheFlag.Name),
