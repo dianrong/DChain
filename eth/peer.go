@@ -231,8 +231,8 @@ func (p *peer) RequestReceipts(hashes []common.Hash) error {
 }
 
 // Handshake executes the eth protocol handshake, negotiating version number,
-// network IDs, difficulties, head and genesis blocks.
-func (p *peer) Handshake(network int, td *big.Int, head common.Hash, genesis common.Hash) error {
+// network IDs, difficulties, head, genesis blocks and config msg.
+func (p *peer) Handshake(network int, td *big.Int, head common.Hash, genesis common.Hash, configHash common.Hash) error {
 	// Send out own handshake in a new thread
 	errc := make(chan error, 2)
 	var status statusData // safe to read after two values have been received from errc
@@ -244,10 +244,11 @@ func (p *peer) Handshake(network int, td *big.Int, head common.Hash, genesis com
 			TD:              td,
 			CurrentBlock:    head,
 			GenesisBlock:    genesis,
+			ConfigMsg:	 configHash,
 		})
 	}()
 	go func() {
-		errc <- p.readStatus(network, &status, genesis)
+		errc <- p.readStatus(network, &status, genesis, configHash)
 	}()
 	timeout := time.NewTimer(handshakeTimeout)
 	defer timeout.Stop()
@@ -265,7 +266,7 @@ func (p *peer) Handshake(network int, td *big.Int, head common.Hash, genesis com
 	return nil
 }
 
-func (p *peer) readStatus(network int, status *statusData, genesis common.Hash) (err error) {
+func (p *peer) readStatus(network int, status *statusData, genesis common.Hash, configHash common.Hash) (err error) {
 	msg, err := p.rw.ReadMsg()
 	if err != nil {
 		return err
@@ -282,6 +283,9 @@ func (p *peer) readStatus(network int, status *statusData, genesis common.Hash) 
 	}
 	if status.GenesisBlock != genesis {
 		return errResp(ErrGenesisBlockMismatch, "%x (!= %x)", status.GenesisBlock, genesis)
+	}
+	if status.ConfigMsg != configHash {
+		return errResp(ErrConfigMsgMismatch, "%x (!= %x)", status.ConfigMsg, configHash)
 	}
 	if int(status.NetworkId) != network {
 		return errResp(ErrNetworkIdMismatch, "%d (!= %d)", status.NetworkId, network)

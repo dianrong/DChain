@@ -62,6 +62,7 @@ func errResp(code errCode, format string, v ...interface{}) error {
 type ProtocolManager struct {
 	networkId int
 	nodeType  ca.NodeType
+	configHash common.Hash
 
 	fastSync uint32 // Flag whether fast sync is enabled (gets disabled if we already have blocks)
 	synced   uint32 // Flag whether we're considered synchronised (enables transaction processing)
@@ -96,11 +97,12 @@ type ProtocolManager struct {
 
 // NewProtocolManager returns a new ethereum sub protocol manager. The Ethereum sub protocol manages peers capable
 // with the ethereum network.
-func NewProtocolManager(config *core.ChainConfig, fastSync bool, networkId int, mux *event.TypeMux, txpool txPool, pow pow.PoW, blockchain *core.BlockChain, chaindb ethdb.Database, nodetype ca.NodeType) (*ProtocolManager, error) {
+func NewProtocolManager(config *core.ChainConfig, configHash common.Hash, fastSync bool, networkId int, mux *event.TypeMux, txpool txPool, pow pow.PoW, blockchain *core.BlockChain, chaindb ethdb.Database, nodetype ca.NodeType) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
 		networkId:   networkId,
 		nodeType:    nodetype,
+		configHash:  configHash,
 		eventMux:    mux,
 		txpool:      txpool,
 		blockchain:  blockchain,
@@ -268,7 +270,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
 
 	// Execute the Ethereum handshake
 	td, head, genesis := pm.blockchain.Status()
-	if err := p.Handshake(pm.networkId, td, head, genesis); err != nil {
+	if err := p.Handshake(pm.networkId, td, head, genesis, pm.configHash); err != nil {
 		glog.V(logger.Debug).Infof("%v: handshake failed: %v", p, err)
 		return err
 	}

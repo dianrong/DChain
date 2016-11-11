@@ -83,7 +83,7 @@ type Config struct {
 	PowTest   bool
 	PowShared bool
 	ExtraData []byte
-	ConfigHash common.Hash
+	ConfigHash common.Hash	// Hash value of the file properties.yaml
 
 	AccountManager *accounts.Manager
 	Etherbase      common.Address
@@ -110,6 +110,7 @@ type Ethereum struct {
 	// Channel for shutting down the ethereum
 	shutdownChan chan bool
 	nodetype     ca.NodeType
+	configHash   common.Hash	// Hash value of the file properties.yaml
 
 	// DB interfaces
 	chainDb ethdb.Database // Block chain database
@@ -207,6 +208,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 		shutdownChan:            make(chan bool),
 		chainDb:                 chainDb,
 		nodetype:                ctx.NodeType,
+		configHash:		 config.ConfigHash,
 		dappDb:                  dappDb,
 		eventMux:                ctx.EventMux,
 		accountManager:          config.AccountManager,
@@ -274,7 +276,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 	newPool := core.NewTxPool(eth.chainConfig, eth.EventMux(), eth.blockchain.State, eth.blockchain.GasLimit)
 	eth.txPool = newPool
 
-	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.FastSync, config.NetworkId, eth.eventMux, eth.txPool, eth.pow, eth.blockchain, chainDb, ctx.NodeType); err != nil {
+	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, eth.configHash, config.FastSync, config.NetworkId, eth.eventMux, eth.txPool, eth.pow, eth.blockchain, chainDb, ctx.NodeType); err != nil {
 		return nil, err
 	}
 	if ctx.NodeType == ca.Validator || ctx.NodeType == ca.Admin {
