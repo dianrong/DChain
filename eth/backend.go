@@ -50,7 +50,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/ethereum/go-ethereum/Godeps/_workspace/src/github.com/spf13/viper"
+	"github.com/spf13/viper"
 )
 
 const (
