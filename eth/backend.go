@@ -50,6 +50,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/Godeps/_workspace/src/github.com/spf13/viper"
 )
 
 const (
@@ -280,9 +281,15 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 		return nil, err
 	}
 	if ctx.NodeType == ca.Validator || ctx.NodeType == ca.Admin {
-		eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.pow)
-		eth.miner.SetGasPrice(config.GasPrice)
-		eth.miner.SetExtra(config.ExtraData)
+		algorithm := viper.GetString("consensus.algorithm")
+		if algorithm == "POW" {
+			eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.pow)
+			eth.miner.SetGasPrice(config.GasPrice)
+			eth.miner.SetExtra(config.ExtraData)
+		} else if algorithm == "PBFT" {
+			// TODO: pbft consensus implement
+		}
+
 	}
 
 	return eth, nil
