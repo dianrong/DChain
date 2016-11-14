@@ -46,7 +46,7 @@ func (s *CAServer)IssueCertificate(ctx context.Context, cr *pb.CertificateReques
 
 	name := strings.Replace(cr.Name, "/", "_", -1)
 
-	if cert, err := cap.IssueCertificate(cr.In, name, ca.Peer); err != nil {
+	if cert, err := cap.IssueCertificate(cr.In, name, ca.Validator); err != nil {
 		slogger.Panicf("Failed IssueCertificate [%s]", err)
 		return nil, err
 	}else {
