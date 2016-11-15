@@ -51,6 +51,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/spf13/viper"
+	"github.com/ethereum/go-ethereum/pbft"
 )
 
 const (
@@ -139,6 +140,7 @@ type Ethereum struct {
 
 	eventMux *event.TypeMux
 	miner    *miner.Miner
+	pbft	 pbft.Consenter
 
 	Mining        bool
 	MinerThreads  int
@@ -288,6 +290,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 			eth.miner.SetExtra(config.ExtraData)
 		} else if algorithm == "PBFT" {
 			// TODO: pbft consensus implement
+			eth.pbft = pbft.New()
 		}
 
 	}

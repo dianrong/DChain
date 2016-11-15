@@ -51,6 +51,8 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/syndtr/goleveldb/leveldb"
 	"golang.org/x/net/context"
+	"github.com/spf13/viper"
+	"github.com/ethereum/go-ethereum/pbft"
 )
 
 const defaultGas = uint64(90000)
@@ -935,6 +937,7 @@ type PublicTransactionPoolAPI struct {
 	am              *accounts.Manager
 	txPool          *core.TxPool
 	txMu            *sync.Mutex
+	pbft		pbft.Consenter
 	muPendingTxSubs sync.Mutex
 	pendingTxSubs   map[string]rpc.Subscription
 }
@@ -950,6 +953,7 @@ func NewPublicTransactionPoolAPI(e *Ethereum) *PublicTransactionPoolAPI {
 		txPool:        e.txPool,
 		txMu:          &e.txMu,
 		miner:         e.miner,
+		pbft:	       e.pbft,
 		pendingTxSubs: make(map[string]rpc.Subscription),
 	}
 	go api.subscriptionLoop()
@@ -1196,6 +1200,18 @@ func submitTransaction(txPool *core.TxPool, tx *types.Transaction, signature []b
 	return signedTx.Hash(), nil
 }
 
+func submitTransactionPbft(pbft pbft.Consenter, tx *types.Transaction, signature []byte) (common.Hash, error) {
+	signedTx, err := tx.WithSignature(signature)
+	if err != nil {
+		return common.Hash{}, err
+	}
+
+	pbft.RecvMsg(signedTx)
+	glog.V(logger.Info).Infof("Tx(%s) to: %s\n", signedTx.Hash().Hex(), tx.To().Hex())
+
+	return signedTx.Hash(), nil
+}
+
 // SendTransaction creates a transaction for the given argument, sign it and submit it to the
 // transaction pool.
 func (s *PublicTransactionPoolAPI) SendTransaction(args SendTxArgs) (common.Hash, error) {
@@ -1220,7 +1236,14 @@ func (s *PublicTransactionPoolAPI) SendTransaction(args SendTxArgs) (common.Hash
 		return common.Hash{}, err
 	}
 
-	return submitTransaction(s.txPool, tx, signature)
+	algorithm := viper.GetString("consensus.algorithm")
+	if algorithm == "POW" {
+		return submitTransaction(s.txPool, tx, signature)
+	} else if algorithm == "PBFT" {
+		return submitTransactionPbft(s.pbft, tx, signature)
+	}
+
+	return common.Hash{}, nil
 }
 
 // SendRawTransaction will add the signed transaction to the transaction pool.

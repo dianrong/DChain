@@ -1,5 +1,7 @@
 package pbft
 
+import "github.com/ethereum/go-ethereum/core/types"
+
 
 // commitedEvent is sent when a requested commit completes
 type committedEvent struct {
@@ -14,16 +16,11 @@ type externalEventReceiver struct {
 }
 
 // RecvMsg is called by the stack when a new message is received
-func (eer *externalEventReceiver) RecvMsg() error {
+func (eer *externalEventReceiver) RecvMsg(tx *types.Transaction) error {
 	eer.manager.Queue() <- batchMessageEvent{
-
+		tx: tx,
 	}
 	return nil
-}
-
-// Committed is called whenever Commit completes, no-op for noops as it uses the legacy synchronous api
-func (eer *externalEventReceiver) Committed(tag interface{}, target *pb.BlockchainInfo) {
-	eer.manager.Queue() <- committedEvent{tag, target}
 }
 
 // RolledBack is called whenever a Rollback completes, no-op for noops as it uses the legacy synchronous api

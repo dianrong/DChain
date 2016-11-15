@@ -6,7 +6,12 @@ import (
 	"fmt"
 	"github.com/spf13/viper"
 	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/core/types"
 )
+
+type Consenter interface {
+	RecvMsg(*types.Transaction) error // Called serially with incoming messages from gRPC
+}
 
 type pbftCore struct {
 						       // internal data
@@ -64,10 +69,14 @@ type pbftCore struct {
 	//newViewStore    map[uint64]*NewView      // track last new-view we received or sent
 }
 
-func newPbftCore(id uint64, /*consumer innerStack, etf events.TimerFactory*/) *pbftCore {
+func New() Consenter {
+	return newObcBatch()
+}
+
+func newPbftCore() *pbftCore {
 	var err error
 	instance := &pbftCore{}
-	instance.id = id
+	//instance.id = id
 	//instance.consumer = consumer
 	//
 	//instance.newViewTimer = etf.CreateTimer()

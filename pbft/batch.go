@@ -3,13 +3,12 @@ package pbft
 import (
 	"time"
 	"fmt"
-	"gopkg.in/karalabe/cookiejar.v2/collections/stack"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/spf13/viper"
+	"github.com/ethereum/go-ethereum/core/types"
 )
 
 type obcBatch struct {
-	pbft  *pbftCore
 
 	externalEventReceiver
 	pbft        *pbftCore
@@ -21,6 +20,7 @@ type obcBatch struct {
 }
 
 type batchMessage struct {
+	tx	*types.Transaction
 }
 
 // Event types
@@ -28,11 +28,11 @@ type batchMessage struct {
 // batchMessageEvent is sent when a consensus message is received that is then to be sent to pbft
 type batchMessageEvent batchMessage
 
-func newObcBatch(id uint64) *obcBatch {
+func newObcBatch() *obcBatch {
 	var err error
 
 	op := &obcBatch{}
-	op.pbft = newPbftCore(id)
+	op.pbft = newPbftCore()
 
 	op.batchSize = viper.GetInt("general.batchsize")
 	op.batchTimeout, err = time.ParseDuration(viper.GetString("general.timeout.batch"))
@@ -65,8 +65,8 @@ func (op *obcBatch) ProcessEvent(event Event) Event {
 	logger.Debugf("Replica %d batch main thread looping", op.pbft.id)
 	switch et := event.(type) {
 	case batchMessageEvent:
-		ocMsg := et
-		return op.processMessage()
+		msg := et
+		return op.processMessage(msg.tx)
 	default:
 		return op.pbft.ProcessEvent(event)
 	}
@@ -75,8 +75,8 @@ func (op *obcBatch) ProcessEvent(event Event) Event {
 }
 
 
-func (op *obcBatch) processMessage() Event {
-
+func (op *obcBatch) processMessage(tx *types.Transaction) Event {
+	fmt.Printf("transaction : data - %d;  value - %d", tx.Data(), tx.Value())
 	return nil
 }
 
