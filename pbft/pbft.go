@@ -163,5 +163,20 @@ func newPbftCore(id uint64, /*consumer innerStack, etf events.TimerFactory*/) *p
 	return instance
 }
 
+// allow the view-change protocol to kick-off when the timer expires
+func (instance *pbftCore) ProcessEvent(e Event) Event {
+	var err error
+	logger.Debugf("Replica %d processing event", instance.id)
+	switch et := e.(type) {
 
+	default:
+		logger.Warningf("Replica %d received an unknown message type %T", instance.id, et)
+	}
+
+	if err != nil {
+		logger.Warning(err.Error())
+	}
+
+	return nil
+}
 

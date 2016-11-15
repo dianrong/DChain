@@ -20,6 +20,14 @@ type obcBatch struct {
 	batchTimeout     time.Duration
 }
 
+type batchMessage struct {
+}
+
+// Event types
+
+// batchMessageEvent is sent when a consensus message is received that is then to be sent to pbft
+type batchMessageEvent batchMessage
+
 func newObcBatch(id uint64) *obcBatch {
 	var err error
 
@@ -34,6 +42,11 @@ func newObcBatch(id uint64) *obcBatch {
 	glog.Infof("PBFT Batch size = %d", op.batchSize)
 	glog.Infof("PBFT Batch timeout = %v", op.batchTimeout)
 
+	op.manager = NewManagerImpl() // TODO, this is hacky, eventually rip it out
+	op.manager.SetReceiver(op)
+	op.manager.Start()
+	op.externalEventReceiver.manager = op.manager
+
 	if op.batchTimeout >= op.pbft.requestTimeout {
 		op.pbft.requestTimeout = 3 * op.batchTimeout / 2
 		glog.Warningf("Configured request timeout must be greater than batch timeout, setting to %v", op.pbft.requestTimeout)
@@ -46,3 +59,24 @@ func newObcBatch(id uint64) *obcBatch {
 
 	return op
 }
+
+// allow the primary to send a batch when the timer expires
+func (op *obcBatch) ProcessEvent(event Event) Event {
+	logger.Debugf("Replica %d batch main thread looping", op.pbft.id)
+	switch et := event.(type) {
+	case batchMessageEvent:
+		ocMsg := et
+		return op.processMessage()
+	default:
+		return op.pbft.ProcessEvent(event)
+	}
+
+	return nil
+}
+
+
+func (op *obcBatch) processMessage() Event {
+
+	return nil
+}
+
