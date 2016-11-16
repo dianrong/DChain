@@ -158,6 +158,10 @@ func (s *PublicEthereumAPI) Hashrate() *rpc.HexNumber {
 		return nil
 	}
 
+	if viper.GetString("consensus.algorithm") != "POW" {
+		return nil
+	}
+
 	return rpc.NewHexNumber(s.e.Miner().HashRate())
 }
 
@@ -197,6 +201,11 @@ func NewPublicMinerAPI(e *Ethereum) *PublicMinerAPI {
 	if e.nodetype == ca.Client || e.nodetype == ca.Peer {
 		return nil
 	}
+
+	if viper.GetString("consensus.algorithm") != "POW" {
+		return nil
+	}
+
 	agent := miner.NewRemoteAgent()
 	e.Miner().Register(agent)
 

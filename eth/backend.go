@@ -373,12 +373,14 @@ func (s *Ethereum) APIs() []rpc.API {
 	}
 
 	if s.nodetype == ca.Validator || s.nodetype == ca.Admin {
-		apis = append(apis, rpc.API{
-			Namespace: "eth",
-			Version:   "1.0",
-			Service:   NewPublicMinerAPI(s),
-			Public:    true,
-		})
+		if viper.GetString("consensus.algorithm") == "POW" {
+			apis = append(apis, rpc.API{
+				Namespace: "eth",
+				Version:   "1.0",
+				Service:   NewPublicMinerAPI(s),
+				Public:    true,
+			})
+		}
 	}
 
 	return apis
@@ -404,20 +406,26 @@ func (s *Ethereum) Etherbase() (eb common.Address, err error) {
 func (self *Ethereum) SetEtherbase(etherbase common.Address) {
 	self.etherbase = etherbase
 	if self.nodetype == ca.Validator || self.nodetype == ca.Admin {
-		self.miner.SetEtherbase(etherbase)
+		if viper.GetString("consensus.algorithm") == "POW" {
+			self.miner.SetEtherbase(etherbase)
+		}
 	}
 }
 
 func (s *Ethereum) IsMining() bool {
 	if s.nodetype == ca.Validator || s.nodetype == ca.Admin {
-		return s.miner.Mining()
+		if viper.GetString("consensus.algorithm") == "POW" {
+			return s.miner.Mining()
+		}
 	}
 	return false
 }
 
 func (s *Ethereum) StopMining() {
 	if s.nodetype == ca.Validator || s.nodetype == ca.Admin {
-		s.miner.Stop()
+		if viper.GetString("consensus.algorithm") == "POW" {
+			s.miner.Stop()
+		}
 	}
 }
 
@@ -459,7 +467,9 @@ func (s *Ethereum) Stop() error {
 	s.txPool.Stop()
 
 	if s.nodetype == ca.Validator || s.nodetype == ca.Admin {
-		s.miner.Stop()
+		if viper.GetString("consensus.algorithm") == "POW" {
+			s.miner.Stop()
+		}
 	}
 	s.eventMux.Stop()
 
