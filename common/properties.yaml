@@ -29,7 +29,8 @@ pki:
 consensus:
 
           # POW or PBFT
-          algorithm: "PBFT"
+          algorithm: "POW"
+          #algorithm: "PBFT"
 
           # Operational mode: currently only batch ( this value is case-insensitive)
           mode: batch

@@ -6,11 +6,15 @@ import (
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/spf13/viper"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/core"
 )
 
 type obcBatch struct {
 
 	externalEventReceiver
+
+	mux         *event.TypeMux
 	pbft        *pbftCore
 	broadcaster *broadcaster
 
@@ -28,10 +32,11 @@ type batchMessage struct {
 // batchMessageEvent is sent when a consensus message is received that is then to be sent to pbft
 type batchMessageEvent batchMessage
 
-func newObcBatch() *obcBatch {
+func newObcBatch(mux *event.TypeMux) *obcBatch {
 	var err error
 
 	op := &obcBatch{}
+	op.mux = mux
 	op.pbft = newPbftCore()
 
 	op.batchSize = viper.GetInt("consensus.batchsize")
@@ -76,7 +81,14 @@ func (op *obcBatch) ProcessEvent(event Event) Event {
 
 
 func (op *obcBatch) processMessage(tx *types.Transaction) Event {
-	fmt.Printf("transaction : data - %d;  value - %d", tx.Data(), tx.Value())
-	return nil
+	logger.Infof("transaction : data - %d;  value - %d", tx.Data(), tx.Value())
+
+	return op.submitToLeader(tx)
 }
 
+func (op *obcBatch) submitToLeader(tx *types.Transaction) Event {
+	// Broadcast the request to the network, in case we're in the wrong view
+	op.mux.Post(core.TxPbftEvent{Tx: tx})
+
+	return nil
+}

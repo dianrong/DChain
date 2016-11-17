@@ -40,6 +40,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/pow"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -81,6 +82,7 @@ type ProtocolManager struct {
 	eventMux      *event.TypeMux
 	txSub         event.Subscription
 	minedBlockSub event.Subscription
+	txPbftSub     event.Subscription
 
 	// channels for fetcher, syncer, txsyncLoop
 	newPeerCh   chan *peer
@@ -221,8 +223,13 @@ func (pm *ProtocolManager) Start() {
 	}
 	// broadcast mined blocks
 	if pm.nodeType == ca.Validator || pm.nodeType == ca.Admin {
-		pm.minedBlockSub = pm.eventMux.Subscribe(core.NewMinedBlockEvent{})
-		go pm.minedBroadcastLoop()
+		if viper.GetString("consensus.algorithm") == "POW" {
+			pm.minedBlockSub = pm.eventMux.Subscribe(core.NewMinedBlockEvent{})
+			go pm.minedBroadcastLoop()
+		} else if viper.GetString("consensus.algorithm") == "PBFT" {
+			pm.txPbftSub = pm.eventMux.Subscribe(core.TxPbftEvent{})
+			go pm.txPbftBroadcastLoop()
+		}
 	}
 
 	// start sync handlers
@@ -237,7 +244,9 @@ func (pm *ProtocolManager) Stop() {
 		pm.txSub.Unsubscribe() // quits txBroadcastLoop
 	}
 	if pm.nodeType == ca.Validator || pm.nodeType == ca.Admin {
-		pm.minedBlockSub.Unsubscribe() // quits blockBroadcastLoop
+		if viper.GetString("consensus.algorithm") == "POW" {
+			pm.minedBlockSub.Unsubscribe() // quits blockBroadcastLoop
+		}
 	}
 
 	// Quit the sync loop.
@@ -762,6 +771,15 @@ func (self *ProtocolManager) minedBroadcastLoop() {
 		case core.NewMinedBlockEvent:
 			self.BroadcastBlock(ev.Block, true)  // First propagate block to peers
 			self.BroadcastBlock(ev.Block, false) // Only then announce to the rest
+		}
+	}
+}
+
+func (self *ProtocolManager) txPbftBroadcastLoop() {
+	for obj := range self.txPbftSub.Chan() {
+		switch ev := obj.Data.(type) {
+		case core.TxPbftEvent:
+			fmt.Println("Handl transaction : data - %d;  value - %d", ev.Tx.Data(), ev.Tx.Value())
 		}
 	}
 }

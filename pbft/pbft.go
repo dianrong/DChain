@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/event"
 )
 
 type Consenter interface {
@@ -69,8 +70,8 @@ type pbftCore struct {
 	//newViewStore    map[uint64]*NewView      // track last new-view we received or sent
 }
 
-func New() Consenter {
-	return newObcBatch()
+func New(mux *event.TypeMux) Consenter {
+	return newObcBatch(mux)
 }
 
 func newPbftCore() *pbftCore {
