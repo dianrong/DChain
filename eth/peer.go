@@ -141,6 +141,10 @@ func (p *peer) SendTransactions(txs types.Transactions) error {
 	return p2p.Send(p.rw, TxMsg, txs)
 }
 
+func (p *peer) SendPbftTransaction(tx *types.Transaction) error {
+	return p2p.Send(p.rw, PbftTxMsg, *tx)
+}
+
 // SendNewBlockHashes announces the availability of a number of blocks through
 // a hash notification.
 func (p *peer) SendNewBlockHashes(hashes []common.Hash, numbers []uint64) error {

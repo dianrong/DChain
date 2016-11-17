@@ -292,6 +292,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 			// TODO: pbft consensus implement
 			eth.txPool.Pending()
 			eth.pbft = pbft.New(eth.eventMux)
+			eth.protocolManager.SetPbft(eth.pbft)
 		}
 	}
 

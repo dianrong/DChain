@@ -1209,13 +1209,16 @@ func submitTransaction(txPool *core.TxPool, tx *types.Transaction, signature []b
 	return signedTx.Hash(), nil
 }
 
-func submitTransactionPbft(pbft pbft.Consenter, tx *types.Transaction, signature []byte) (common.Hash, error) {
+func submitTransactionPbft(bft pbft.Consenter, tx *types.Transaction, signature []byte) (common.Hash, error) {
 	signedTx, err := tx.WithSignature(signature)
 	if err != nil {
 		return common.Hash{}, err
 	}
 
-	pbft.RecvMsg(signedTx)
+	bft.RecvMsg(&pbft.Message {
+		Type: pbft.Message_CHAIN_TRANSACTION,
+		Tx:   signedTx,
+	})
 	glog.V(logger.Info).Infof("Tx(%s) to: %s\n", signedTx.Hash().Hex(), tx.To().Hex())
 
 	return signedTx.Hash(), nil

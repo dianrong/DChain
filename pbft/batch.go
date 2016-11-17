@@ -24,7 +24,7 @@ type obcBatch struct {
 }
 
 type batchMessage struct {
-	tx	*types.Transaction
+	msg	*Message
 }
 
 // Event types
@@ -71,7 +71,7 @@ func (op *obcBatch) ProcessEvent(event Event) Event {
 	switch et := event.(type) {
 	case batchMessageEvent:
 		msg := et
-		return op.processMessage(msg.tx)
+		return op.processMessage(msg.msg)
 	default:
 		return op.pbft.ProcessEvent(event)
 	}
@@ -80,10 +80,20 @@ func (op *obcBatch) ProcessEvent(event Event) Event {
 }
 
 
-func (op *obcBatch) processMessage(tx *types.Transaction) Event {
-	logger.Infof("transaction : data - %d;  value - %d", tx.Data(), tx.Value())
+func (op *obcBatch) processMessage(msg	*Message) Event {
+	if msg.Type == Message_CHAIN_TRANSACTION {
+		logger.Infof("transaction : data - %d;  value - %d", msg.Tx.Data(), msg.Tx.Value())
 
-	return op.submitToLeader(tx)
+		return op.submitToLeader(msg.Tx)
+	}
+
+	if msg.Type != Message_CONSENSUS {
+		logger.Errorf("Unexpected message type: %s", msg.Type)
+		return nil
+	}
+
+	// TODO recive the Message_CONSENSUS from handler.go:
+	return nil
 }
 
 func (op *obcBatch) submitToLeader(tx *types.Transaction) Event {

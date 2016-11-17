@@ -11,7 +11,33 @@ import (
 )
 
 type Consenter interface {
-	RecvMsg(*types.Transaction) error // Called serially with incoming messages from gRPC
+	RecvMsg(*Message) error // Called serially with incoming messages from gRPC
+}
+
+type Message_Type int32
+
+const (
+	Message_UNDEFINED               Message_Type = 0
+	Message_DISC_HELLO              Message_Type = 1
+	Message_DISC_DISCONNECT         Message_Type = 2
+	Message_DISC_GET_PEERS          Message_Type = 3
+	Message_DISC_PEERS              Message_Type = 4
+	Message_DISC_NEWMSG             Message_Type = 5
+	Message_CHAIN_TRANSACTION       Message_Type = 6
+	Message_SYNC_GET_BLOCKS         Message_Type = 11
+	Message_SYNC_BLOCKS             Message_Type = 12
+	Message_SYNC_BLOCK_ADDED        Message_Type = 13
+	Message_SYNC_STATE_GET_SNAPSHOT Message_Type = 14
+	Message_SYNC_STATE_SNAPSHOT     Message_Type = 15
+	Message_SYNC_STATE_GET_DELTAS   Message_Type = 16
+	Message_SYNC_STATE_DELTAS       Message_Type = 17
+	Message_RESPONSE                Message_Type = 20
+	Message_CONSENSUS               Message_Type = 21
+)
+
+type Message struct {
+	Type Message_Type
+	Tx   *types.Transaction
 }
 
 type pbftCore struct {
