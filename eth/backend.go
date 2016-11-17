@@ -290,9 +290,9 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 			eth.miner.SetExtra(config.ExtraData)
 		} else if algorithm == "PBFT" {
 			// TODO: pbft consensus implement
-			eth.pbft = pbft.New()
+			eth.txPool.Pending()
+			eth.pbft = pbft.New(eth.eventMux)
 		}
-
 	}
 
 	return eth, nil
