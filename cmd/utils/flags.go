@@ -682,15 +682,7 @@ func MakeSystemNode(name, version string, relconf release.Config, extra []byte, 
 	}
 
 	dat, err := ioutil.ReadFile("./common/properties.yaml")
-	fmt.Print(string(dat))
-
-	config := ""
-	keys := viper.AllKeys()
-	for _, key := range keys {
-		config += key
-		config += viper.GetString(key)
-	}
-	configHash := common.BytesToHash([]byte(config))
+	configHash := common.BytesToHash([]byte(dat))
 
 	// Configure the node's service container
 	stackConf := &node.Config{
