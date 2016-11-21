@@ -344,6 +344,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	if err != nil {
 		return err
 	}
+
 	if msg.Size > ProtocolMaxMsgSize {
 		return errResp(ErrMsgTooLarge, "%v > %v", msg.Size, ProtocolMaxMsgSize)
 	}
@@ -720,15 +721,20 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		pm.txpool.AddBatch(txs)
 
 	case msg.Code == PbftTxMsg:
-		var tx *types.Transaction
-		if err := msg.Decode(&tx); err != nil {
+
+		var txs []*types.Transaction
+		if err := msg.Decode(&txs); err != nil {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
 		}
 
-		pm.pbft.RecvMsg(&pbft.Message {
-			Type: pbft.Message_CONSENSUS,
-			Tx:   tx,
-		})
+		for _, tx := range txs {
+			glog.V(logger.Debug).Infof("Get tx: %d", tx.Value())
+
+			pm.pbft.RecvMsg(&pbft.Message{
+				Type: pbft.Message_CONSENSUS,
+				Tx:   tx,
+			})
+		}
 
 	default:
 		return errResp(ErrInvalidMsgCode, "%v", msg.Code)
@@ -783,7 +789,7 @@ func (pm *ProtocolManager) BroadcastTx(hash common.Hash, tx *types.Transaction) 
 func (pm *ProtocolManager) PbftBroadcastTx(tx *types.Transaction) {
 
 	for _, peer := range pm.peers.peers {
-		peer.SendPbftTransaction(tx)
+		peer.SendPbftTransaction(types.Transactions{tx})
 	}
 	glog.V(logger.Detail).Infoln("broadcast pbft tx to", pm.peers.Len(), "peers")
 }
@@ -805,7 +811,7 @@ func (self *ProtocolManager) txPbftBroadcastLoop() {
 		event := obj.Data.(core.TxPbftEvent)
 
 		fmt.Println("Handl transaction : data - %d;  value - %d", event.Tx.Data(), event.Tx.Value())
-
+		self.PbftBroadcastTx(event.Tx)
 	}
 }
 

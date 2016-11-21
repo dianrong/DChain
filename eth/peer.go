@@ -141,8 +141,9 @@ func (p *peer) SendTransactions(txs types.Transactions) error {
 	return p2p.Send(p.rw, TxMsg, txs)
 }
 
-func (p *peer) SendPbftTransaction(tx *types.Transaction) error {
-	return p2p.Send(p.rw, PbftTxMsg, *tx)
+func (p *peer) SendPbftTransaction(txs types.Transactions) error {
+	fmt.Println("send pbft to peer : " + p.id)
+	return p2p.Send(p.rw, PbftTxMsg, txs)
 }
 
 // SendNewBlockHashes announces the availability of a number of blocks through

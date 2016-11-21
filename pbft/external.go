@@ -15,6 +15,7 @@ type externalEventReceiver struct {
 
 // RecvMsg is called by the stack when a new message is received
 func (eer *externalEventReceiver) RecvMsg(msg *Message) error {
+	logger.Infof("RecvMsg external.go")
 	eer.manager.Queue() <- batchMessageEvent{
 		msg: msg,
 	}

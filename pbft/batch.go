@@ -93,6 +93,7 @@ func (op *obcBatch) processMessage(msg	*Message) Event {
 	}
 
 	// TODO recive the Message_CONSENSUS from handler.go:
+	logger.Infof("recive the Message_CONSENSUS from handler.go")
 	return nil
 }
 
