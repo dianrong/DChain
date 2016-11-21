@@ -681,6 +681,9 @@ func MakeSystemNode(name, version string, relconf release.Config, extra []byte, 
 		Fatalf("Fatal error when reading config file: %s", err)
 	}
 
+	dat, err := ioutil.ReadFile("./common/properties.yaml")
+	fmt.Print(string(dat))
+
 	config := ""
 	keys := viper.AllKeys()
 	for _, key := range keys {
