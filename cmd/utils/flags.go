@@ -681,13 +681,8 @@ func MakeSystemNode(name, version string, relconf release.Config, extra []byte, 
 		Fatalf("Fatal error when reading config file: %s", err)
 	}
 
-	config := ""
-	keys := viper.AllKeys()
-	for _, key := range keys {
-		config += key
-		config += viper.GetString(key)
-	}
-	configHash := common.BytesToHash([]byte(config))
+	dat, err := ioutil.ReadFile("./common/properties.yaml")
+	configHash := common.BytesToHash([]byte(dat))
 
 	// Configure the node's service container
 	stackConf := &node.Config{
