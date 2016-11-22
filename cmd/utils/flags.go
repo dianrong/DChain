@@ -18,6 +18,7 @@ package utils
 
 import (
 	"crypto/ecdsa"
+	"crypto/md5"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -682,7 +683,9 @@ func MakeSystemNode(name, version string, relconf release.Config, extra []byte, 
 	}
 
 	dat, err := ioutil.ReadFile("./common/properties.yaml")
-	configHash := common.BytesToHash([]byte(dat))
+	sum := md5.Sum(dat)
+	configHash := common.BytesToHash([]byte(sum[:]))
+	fmt.Println(configHash)
 
 	// Configure the node's service container
 	stackConf := &node.Config{
