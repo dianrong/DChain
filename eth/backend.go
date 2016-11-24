@@ -291,7 +291,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 		} else if algorithm == "PBFT" {
 			// TODO: pbft consensus implement
 			eth.txPool.Pending()
-			eth.pbft = pbft.New(eth.eventMux)
+			eth.pbft = pbft.New(eth.eventMux, ctx.PeerId)
 			eth.protocolManager.SetPbft(eth.pbft)
 		}
 	}

@@ -34,6 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
+	"encoding/binary"
 )
 
 var (
@@ -174,8 +175,11 @@ func (n *Node) Start() error {
 			val := int32(uint8(ext.Value[0]))
 			if err == nil && val >= 0 && val <= 3 {
 				running.NodeType = ca.NodeType(val)
-				break
 			}
+		} else if ext.Critical && ext.Id.Equal([]int{1, 33, 81}) {
+			val := binary.LittleEndian.Uint32(ext.Value)
+			running.PeerId = val
+			fmt.Println("Peer Id is : ", val)
 		}
 	}
 
@@ -190,6 +194,7 @@ func (n *Node) Start() error {
 			services: make(map[reflect.Type]Service),
 			EventMux: n.eventmux,
 			NodeType: running.NodeType,
+			PeerId:   running.PeerId,
 		}
 		for kind, s := range services { // copy needed for threaded access
 			ctx.services[kind] = s

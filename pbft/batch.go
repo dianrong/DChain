@@ -32,12 +32,12 @@ type batchMessage struct {
 // batchMessageEvent is sent when a consensus message is received that is then to be sent to pbft
 type batchMessageEvent batchMessage
 
-func newObcBatch(mux *event.TypeMux) *obcBatch {
+func newObcBatch(mux *event.TypeMux, peerId uint32) *obcBatch {
 	var err error
 
 	op := &obcBatch{}
 	op.mux = mux
-	op.pbft = newPbftCore()
+	op.pbft = newPbftCore(peerId)
 
 	op.batchSize = viper.GetInt("consensus.batchsize")
 	op.batchTimeout, err = time.ParseDuration(viper.GetString("consensus.timeout.batch"))
