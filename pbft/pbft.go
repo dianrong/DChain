@@ -40,6 +40,11 @@ type Message struct {
 	Tx   *types.Transaction
 }
 
+type Request struct {
+	Timestamp time.Time
+	Msg       Message
+}
+
 type pbftCore struct {
 						       // internal data
 	internalLock sync.Mutex
@@ -54,7 +59,7 @@ type pbftCore struct {
 	f             int               // max. number of faults we can tolerate
 	N             int               // max.number of validators in the network
 	h             uint64            // low watermark
-	id            uint64            // replica ID; PBFT `i`
+	id            uint32            // replica ID; PBFT `i`
 	K             uint64            // checkpoint period
 	logMultiplier uint64            // use this value to calculate log size : k*logMultiplier
 	L             uint64            // log size
@@ -96,14 +101,15 @@ type pbftCore struct {
 	//newViewStore    map[uint64]*NewView      // track last new-view we received or sent
 }
 
-func New(mux *event.TypeMux) Consenter {
-	return newObcBatch(mux)
+func New(mux *event.TypeMux, peerId uint32) Consenter {
+	return newObcBatch(mux, peerId)
 }
 
-func newPbftCore() *pbftCore {
+func newPbftCore(peerId uint32) *pbftCore {
 	var err error
 	instance := &pbftCore{}
-	//instance.id = id
+	instance.id = peerId
+
 	//instance.consumer = consumer
 	//
 	//instance.newViewTimer = etf.CreateTimer()

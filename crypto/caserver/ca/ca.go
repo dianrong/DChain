@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+	"encoding/binary"
 
 	_ "github.com/mattn/go-sqlite3" // This blank import is required to load sqlite3 driver
 	"github.com/op/go-logging"
@@ -65,6 +66,7 @@ type CA struct {
 
 	path string
 
+	peerid uint32
 	priv *ecdsa.PrivateKey
 	cert *x509.Certificate
 	raw  []byte
@@ -231,6 +233,7 @@ func NewCA(name string, initTables TableInitializer) *CA {
 		return nil
 	}
 
+	ca.peerid = 1
 	ca.path = filepath.Join(user.HomeDir, rootPath, caDir)
 
 	caLogger.Info(ca.path)
@@ -358,12 +361,22 @@ func (ca *CA) readCAPrivateKey(name string) (*ecdsa.PrivateKey, error) {
 func (ca *CA) createCACertificate(name string, pub *ecdsa.PublicKey, nodetype NodeType) []byte {
 	caLogger.Debug("Creating CA certificate.")
 
+	bs := make([]byte, 4)
+	binary.LittleEndian.PutUint32(bs, ca.peerid)
+
 	var ext []pkix.Extension
-	ext = [] pkix.Extension {pkix.Extension {
-		Id: [] int {1, 33, 80},
-		Critical: true,
-		Value: [] byte {byte(nodetype)},
-	}}
+	ext = [] pkix.Extension {
+		pkix.Extension {
+			Id: [] int {1, 33, 80},
+			Critical: true,
+			Value: [] byte {byte(nodetype)},
+		},
+		pkix.Extension {
+			Id: [] int {1, 33, 81},
+			Critical: true,
+			Value: bs,
+		},
+	}
 
 	raw, err := ca.newCertificate(name, pub, x509.KeyUsageDigitalSignature|x509.KeyUsageCertSign, ext)
 	if err != nil {

@@ -35,6 +35,7 @@ type ServiceContext struct {
 	services map[reflect.Type]Service // Index of the already constructed services
 	EventMux *event.TypeMux           // Event multiplexer used for decoupled notifications
 	NodeType ca.NodeType
+	PeerId   uint32
 }
 
 // OpenDatabase opens an existing database with the given name (or creates one

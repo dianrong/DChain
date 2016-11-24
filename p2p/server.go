@@ -67,6 +67,8 @@ type Config struct {
 
 	NodeType ca.NodeType
 
+	PeerId   uint32
+
 	// MaxPeers is the maximum number of peers that can be
 	// connected. It must be greater than zero.
 	MaxPeers int
