@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+	"math"
 	"encoding/binary"
 
 	_ "github.com/mattn/go-sqlite3" // This blank import is required to load sqlite3 driver
@@ -363,6 +364,12 @@ func (ca *CA) createCACertificate(name string, pub *ecdsa.PublicKey, nodetype No
 
 	bs := make([]byte, 4)
 	binary.LittleEndian.PutUint32(bs, ca.peerid)
+
+	if ca.peerid < math.MaxUint32 - 1 {
+		ca.peerid += 1
+	} else {
+		ca.peerid = 1
+	}
 
 	var ext []pkix.Extension
 	ext = [] pkix.Extension {
