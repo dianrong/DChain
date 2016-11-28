@@ -327,6 +327,10 @@ func (ca *CA) GetCACertificate() ([]byte) {
 	return cooked
 }
 
+func (ca *CA) GetReplicaCount() uint32 {
+	return ca.peerCount
+}
+
 // Stop Close closes down the CA.
 func (ca *CA) Stop() error {
 	err := ca.db.Close()
@@ -374,8 +378,6 @@ func (ca *CA) createCACertificate(name string, pub *ecdsa.PublicKey, nodetype No
 	}
 
 	ca.peerCount += 1
-	bsc := make([]byte, 4)
-	binary.LittleEndian.PutUint32(bsc, ca.peerCount)
 
 	var ext []pkix.Extension
 	ext = [] pkix.Extension {
@@ -388,11 +390,6 @@ func (ca *CA) createCACertificate(name string, pub *ecdsa.PublicKey, nodetype No
 			Id: [] int {1, 33, 81},
 			Critical: true,
 			Value: bs,
-		},
-		pkix.Extension {
-			Id: [] int {1, 33, 82},
-			Critical: true,
-			Value: bsc,
 		},
 	}
 

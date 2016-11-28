@@ -19,6 +19,7 @@ service CA {
     rpc IssueCertificate (CertificateRequest) returns (CertificateReply) {}
     rpc GetCACertificate (NoParam) returns (CertificateReply) {}
     rpc VerifySignature (CertificateData) returns (SignatureValid) {}
+    rpc GetReplicaCount (NoParam) returns (ReplicaCount) {}
 }
 
 message CertificateRequest {
@@ -39,5 +40,7 @@ message SignatureValid {
     bool valid = 1;
 }
 
-
+message ReplicaCount {
+    uint32 count = 1;
+}
 

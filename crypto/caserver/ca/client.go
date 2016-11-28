@@ -61,6 +61,21 @@ func GetCACertificate() ([]byte, error) {
 	return resp.In, nil
 }
 
+func GetReplicaCount() (uint32, error) {
+	sock, caClient, err := GetCAClient()
+	if err != nil {
+		return 0, err
+	}
+	defer sock.Close()
+
+	resp, err := caClient.GetReplicaCount(context.Background(), &pb.NoParam{})
+	if err != nil {
+		return 0, fmt.Errorf("could not GetCACertificate: %v", err)
+	}
+
+	return resp.Count, nil
+}
+
 func IssueCertificate(pubKey *ecdsa.PublicKey, name, path string) (*x509.Certificate, error) {
 	name = strings.Replace(name, "/", "_", -1)
 	host, _ := os.Hostname()

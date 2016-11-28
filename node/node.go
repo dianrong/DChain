@@ -180,15 +180,19 @@ func (n *Node) Start() error {
 			val := binary.LittleEndian.Uint32(ext.Value)
 			running.PeerId = val
 			fmt.Println("Peer Id is : ", val)
-		} else if ext.Critical && ext.Id.Equal([]int{1, 33, 82}) {
-			val := binary.LittleEndian.Uint32(ext.Value)
-			running.ReplicaCount = val
-			fmt.Println("Peer Count is : ", val)
 		}
 	}
 
 	glog.V(logger.Debug).Infof("running.NodeType: %v", running.NodeType)
 	fmt.Println("running.NodeType: ", running.NodeType)
+
+	running.ReplicaCount, err = ca.GetReplicaCount()
+	if err != nil {
+		glog.V(logger.Debug).Infof("running.ReplicaCount: %v", running.ReplicaCount)
+		return fmt.Errorf("Server.ReplicaCount failed %v", err)
+	}
+	fmt.Println("Server.ReplicaCount is : ", running.ReplicaCount)
+
 
 	services := make(map[reflect.Type]Service)
 	for _, constructor := range n.serviceFuncs {
