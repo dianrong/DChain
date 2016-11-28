@@ -69,6 +69,8 @@ type Config struct {
 
 	PeerId   uint32
 
+	ReplicaCount   uint32
+
 	// MaxPeers is the maximum number of peers that can be
 	// connected. It must be greater than zero.
 	MaxPeers int

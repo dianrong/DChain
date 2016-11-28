@@ -32,12 +32,12 @@ type batchMessage struct {
 // batchMessageEvent is sent when a consensus message is received that is then to be sent to pbft
 type batchMessageEvent batchMessage
 
-func newObcBatch(mux *event.TypeMux, peerId uint32) *obcBatch {
+func newObcBatch(mux *event.TypeMux, peerId uint32, peerCount uint32) *obcBatch {
 	var err error
 
 	op := &obcBatch{}
 	op.mux = mux
-	op.pbft = newPbftCore(peerId)
+	op.pbft = newPbftCore(peerId, peerCount)
 
 	op.batchSize = viper.GetInt("consensus.batchsize")
 	op.batchTimeout, err = time.ParseDuration(viper.GetString("consensus.timeout.batch"))
@@ -100,6 +100,10 @@ func (op *obcBatch) processMessage(msg	*Message) Event {
 func (op *obcBatch) submitToLeader(tx *types.Transaction) Event {
 	// Broadcast the request to the network, in case we're in the wrong view
 	op.mux.Post(core.TxPbftEvent{Tx: tx})
+
+	//if op.pbft.primary(op.pbft.view) == op.pbft.id && op.pbft.activeView {
+	//	return op.leaderProcReq(req)
+	//}
 
 	return nil
 }

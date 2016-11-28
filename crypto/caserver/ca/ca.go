@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+	"math"
 	"encoding/binary"
 
 	_ "github.com/mattn/go-sqlite3" // This blank import is required to load sqlite3 driver
@@ -67,6 +68,7 @@ type CA struct {
 	path string
 
 	peerid uint32
+	peerCount uint32
 	priv *ecdsa.PrivateKey
 	cert *x509.Certificate
 	raw  []byte
@@ -234,6 +236,7 @@ func NewCA(name string, initTables TableInitializer) *CA {
 	}
 
 	ca.peerid = 1
+	ca.peerCount = 0
 	ca.path = filepath.Join(user.HomeDir, rootPath, caDir)
 
 	caLogger.Info(ca.path)
@@ -324,6 +327,10 @@ func (ca *CA) GetCACertificate() ([]byte) {
 	return cooked
 }
 
+func (ca *CA) GetReplicaCount() uint32 {
+	return ca.peerCount
+}
+
 // Stop Close closes down the CA.
 func (ca *CA) Stop() error {
 	err := ca.db.Close()
@@ -363,6 +370,14 @@ func (ca *CA) createCACertificate(name string, pub *ecdsa.PublicKey, nodetype No
 
 	bs := make([]byte, 4)
 	binary.LittleEndian.PutUint32(bs, ca.peerid)
+
+	if ca.peerid < math.MaxUint32 - 1 {
+		ca.peerid += 1
+	} else {
+		ca.peerid = 1
+	}
+
+	ca.peerCount += 1
 
 	var ext []pkix.Extension
 	ext = [] pkix.Extension {

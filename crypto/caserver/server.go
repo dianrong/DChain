@@ -67,6 +67,17 @@ func (s *CAServer)GetCACertificate(ctx context.Context, np *pb.NoParam) (*pb.Cer
 	return &reply, nil
 }
 
+func (s *CAServer)GetReplicaCount(ctx context.Context, np *pb.NoParam) (*pb.ReplicaCount, error) {
+	if cap == nil {
+		return nil, nil
+	}
+
+	reply := pb.ReplicaCount{}
+	reply.Count = cap.GetReplicaCount()
+
+	return &reply, nil
+}
+
 func (s *CAServer)VerifySignature(ctx context.Context, certData *pb.CertificateData) (*pb.SignatureValid, error) {
 	valid := pb.SignatureValid{}
 

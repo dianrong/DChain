@@ -186,6 +186,14 @@ func (n *Node) Start() error {
 	glog.V(logger.Debug).Infof("running.NodeType: %v", running.NodeType)
 	fmt.Println("running.NodeType: ", running.NodeType)
 
+	running.ReplicaCount, err = ca.GetReplicaCount()
+	if err != nil {
+		glog.V(logger.Debug).Infof("running.ReplicaCount: %v", running.ReplicaCount)
+		return fmt.Errorf("Server.ReplicaCount failed %v", err)
+	}
+	fmt.Println("Server.ReplicaCount is : ", running.ReplicaCount)
+
+
 	services := make(map[reflect.Type]Service)
 	for _, constructor := range n.serviceFuncs {
 		// Create a new context for the particular service
@@ -195,6 +203,7 @@ func (n *Node) Start() error {
 			EventMux: n.eventmux,
 			NodeType: running.NodeType,
 			PeerId:   running.PeerId,
+			PeerCount: running.ReplicaCount,
 		}
 		for kind, s := range services { // copy needed for threaded access
 			ctx.services[kind] = s
