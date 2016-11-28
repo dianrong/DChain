@@ -68,6 +68,7 @@ type CA struct {
 	path string
 
 	peerid uint32
+	peerCount uint32
 	priv *ecdsa.PrivateKey
 	cert *x509.Certificate
 	raw  []byte
@@ -235,6 +236,7 @@ func NewCA(name string, initTables TableInitializer) *CA {
 	}
 
 	ca.peerid = 1
+	ca.peerCount = 0
 	ca.path = filepath.Join(user.HomeDir, rootPath, caDir)
 
 	caLogger.Info(ca.path)
@@ -371,6 +373,10 @@ func (ca *CA) createCACertificate(name string, pub *ecdsa.PublicKey, nodetype No
 		ca.peerid = 1
 	}
 
+	ca.peerCount += 1
+	bsc := make([]byte, 4)
+	binary.LittleEndian.PutUint32(bsc, ca.peerCount)
+
 	var ext []pkix.Extension
 	ext = [] pkix.Extension {
 		pkix.Extension {
@@ -382,6 +388,11 @@ func (ca *CA) createCACertificate(name string, pub *ecdsa.PublicKey, nodetype No
 			Id: [] int {1, 33, 81},
 			Critical: true,
 			Value: bs,
+		},
+		pkix.Extension {
+			Id: [] int {1, 33, 82},
+			Critical: true,
+			Value: bsc,
 		},
 	}
 

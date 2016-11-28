@@ -56,15 +56,15 @@ type pbftCore struct {
 						       // PBFT data
 	activeView    bool              // view change happening
 	byzantine     bool              // whether this node is intentionally acting as Byzantine; useful for debugging on the testnet
-	f             int               // max. number of faults we can tolerate
-	N             int               // max.number of validators in the network
+	f             uint32               // max. number of faults we can tolerate
+	N             uint32               // max.number of validators in the network
 	h             uint64            // low watermark
 	id            uint32            // replica ID; PBFT `i`
 	K             uint64            // checkpoint period
 	logMultiplier uint64            // use this value to calculate log size : k*logMultiplier
 	L             uint64            // log size
 	lastExec      uint64            // last request we executed
-	replicaCount  int               // number of replicas; PBFT `|R|`
+	replicaCount  uint32               // number of replicas; PBFT `|R|`
 	seqNo         uint64            // PBFT "n", strictly monotonic increasing sequence number
 	view          uint64            // current view
 	chkpts        map[uint64]string // state checkpoints; map lastExec to global hash
@@ -101,14 +101,15 @@ type pbftCore struct {
 	//newViewStore    map[uint64]*NewView      // track last new-view we received or sent
 }
 
-func New(mux *event.TypeMux, peerId uint32) Consenter {
-	return newObcBatch(mux, peerId)
+func New(mux *event.TypeMux, peerId uint32, peerCount uint32) Consenter {
+	return newObcBatch(mux, peerId, peerCount)
 }
 
-func newPbftCore(peerId uint32) *pbftCore {
+func newPbftCore(peerId uint32, peerCount uint32) *pbftCore {
 	var err error
 	instance := &pbftCore{}
 	instance.id = peerId
+	instance.replicaCount = peerCount
 
 	//instance.consumer = consumer
 	//
@@ -116,8 +117,8 @@ func newPbftCore(peerId uint32) *pbftCore {
 	//instance.vcResendTimer = etf.CreateTimer()
 	//instance.nullRequestTimer = etf.CreateTimer()
 
-	instance.N = viper.GetInt("consensus.N")
-	instance.f = viper.GetInt("consensus.f")
+	instance.N = uint32(viper.GetInt("consensus.N"))
+	instance.f = uint32(viper.GetInt("consensus.f"))
 	if instance.f*3+1 > instance.N {
 		panic(fmt.Sprintf("need at least %d enough replicas to tolerate %d byzantine faults, but only %d replicas viperured", instance.f*3+1, instance.f, instance.N))
 	}

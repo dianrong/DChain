@@ -180,6 +180,10 @@ func (n *Node) Start() error {
 			val := binary.LittleEndian.Uint32(ext.Value)
 			running.PeerId = val
 			fmt.Println("Peer Id is : ", val)
+		} else if ext.Critical && ext.Id.Equal([]int{1, 33, 82}) {
+			val := binary.LittleEndian.Uint32(ext.Value)
+			running.ReplicaCount = val
+			fmt.Println("Peer Count is : ", val)
 		}
 	}
 
@@ -195,6 +199,7 @@ func (n *Node) Start() error {
 			EventMux: n.eventmux,
 			NodeType: running.NodeType,
 			PeerId:   running.PeerId,
+			PeerCount: running.ReplicaCount,
 		}
 		for kind, s := range services { // copy needed for threaded access
 			ctx.services[kind] = s
