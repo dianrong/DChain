@@ -21,23 +21,17 @@ type obcBatch struct {
 	batchSize        int
 	batchTimerActive bool
 	batchTimeout     time.Duration
+
+	batchStore       []*types.Request
 }
 
-type batchMessage struct {
-	msg	*Message
-}
-
-// Event types
-
-// batchMessageEvent is sent when a consensus message is received that is then to be sent to pbft
-type batchMessageEvent batchMessage
 
 func newObcBatch(mux *event.TypeMux, peerId uint32, peerCount uint32) *obcBatch {
 	var err error
 
 	op := &obcBatch{}
 	op.mux = mux
-	op.pbft = newPbftCore(peerId, peerCount)
+	op.pbft = newPbftCore(peerId, peerCount, mux)
 
 	op.batchSize = viper.GetInt("consensus.batchsize")
 	op.batchTimeout, err = time.ParseDuration(viper.GetString("consensus.timeout.batch"))
@@ -69,9 +63,9 @@ func newObcBatch(mux *event.TypeMux, peerId uint32, peerCount uint32) *obcBatch 
 func (op *obcBatch) ProcessEvent(event Event) Event {
 	logger.Debugf("Replica %d batch main thread looping", op.pbft.id)
 	switch et := event.(type) {
-	case batchMessageEvent:
+	case types.BatchMessageEvent:
 		msg := et
-		return op.processMessage(msg.msg)
+		return op.processMessage(msg.Msg)
 	default:
 		return op.pbft.ProcessEvent(event)
 	}
@@ -80,14 +74,14 @@ func (op *obcBatch) ProcessEvent(event Event) Event {
 }
 
 
-func (op *obcBatch) processMessage(msg	*Message) Event {
-	if msg.Type == Message_CHAIN_TRANSACTION {
+func (op *obcBatch) processMessage(msg	*types.Message) Event {
+	if msg.Type == types.Message_CHAIN_TRANSACTION {
 		logger.Infof("transaction : data - %d;  value - %d", msg.Tx.Data(), msg.Tx.Value())
 
 		return op.submitToLeader(msg.Tx)
 	}
 
-	if msg.Type != Message_CONSENSUS {
+	if msg.Type != types.Message_CONSENSUS {
 		logger.Errorf("Unexpected message type: %s", msg.Type)
 		return nil
 	}
@@ -101,9 +95,53 @@ func (op *obcBatch) submitToLeader(tx *types.Transaction) Event {
 	// Broadcast the request to the network, in case we're in the wrong view
 	op.mux.Post(core.TxPbftEvent{Tx: tx})
 
-	//if op.pbft.primary(op.pbft.view) == op.pbft.id && op.pbft.activeView {
-	//	return op.leaderProcReq(req)
-	//}
+	if op.pbft.primary(op.pbft.view) == op.pbft.id && op.pbft.activeView {
+		return op.leaderProcReq(op.txToReq(tx))
+	}
 
 	return nil
 }
+
+
+func (op *obcBatch) txToReq(tx *types.Transaction) *types.Request {
+	now := time.Now()
+	req := &types.Request{
+		Timestamp: now,
+		Tx:   tx,
+		ReplicaId: op.pbft.id,
+	}
+
+	return req
+}
+
+// =============================================================================
+// functions specific to batch mode
+// =============================================================================
+
+func (op *obcBatch) leaderProcReq(req *types.Request) Event {
+	// XXX check req sig
+
+	logger.Debugf("Batch primary %d queueing new request", op.pbft.id)
+	op.batchStore = append(op.batchStore, req)
+
+	if len(op.batchStore) >= op.batchSize {
+		return op.sendBatch()
+	}
+
+	return nil
+}
+
+
+func (op *obcBatch) sendBatch() Event {
+
+	if len(op.batchStore) == 0 {
+		logger.Error("Told to send an empty batch store for ordering, ignoring")
+		return nil
+	}
+
+	reqBatch := &types.RequestBatch{Batch: op.batchStore}
+	op.batchStore = nil
+	logger.Infof("Creating batch with %d requests", len(reqBatch.Batch))
+	return reqBatch
+}
+

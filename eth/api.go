@@ -1215,8 +1215,8 @@ func submitTransactionPbft(bft pbft.Consenter, tx *types.Transaction, signature 
 		return common.Hash{}, err
 	}
 
-	bft.RecvMsg(&pbft.Message {
-		Type: pbft.Message_CHAIN_TRANSACTION,
+	bft.RecvMsg(&types.Message {
+		Type: types.Message_CHAIN_TRANSACTION,
 		Tx:   signedTx,
 	})
 	glog.V(logger.Info).Infof("Tx(%s) to: %s\n", signedTx.Hash().Hex(), tx.To().Hex())
