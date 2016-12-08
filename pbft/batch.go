@@ -78,6 +78,8 @@ func (op *obcBatch) processMessage(msg	*types.Message) Event {
 	if msg.Type == types.Message_CHAIN_TRANSACTION {
 		logger.Infof("transaction : data - %d;  value - %d", msg.Tx.Data(), msg.Tx.Value())
 
+		// Broadcast the request to the network, in case we're in the wrong view
+		op.mux.Post(core.TxPbftEvent{Tx: msg.Tx})
 		return op.submitToLeader(msg.Tx)
 	}
 
@@ -87,15 +89,23 @@ func (op *obcBatch) processMessage(msg	*types.Message) Event {
 	}
 
 	// TODO recive the Message_CONSENSUS from handler.go:
-	logger.Infof("recive the Message_CONSENSUS from handler.go")
+	if msg.Tx != nil {
+		return op.submitToLeader(msg.Tx)
+	} else if msg.Prerepare != nil {
+		logger.Infof("recive the Message_CONSENSUS from handler.go : %s", msg.Prerepare.BatchDigest)
+		logger.Infof("recive the Prerepare from handler.go : ", msg.Prerepare.BatchDigest)
+	} else {
+		logger.Infof("recive empty msg ")
+	}
+
 	return nil
 }
 
 func (op *obcBatch) submitToLeader(tx *types.Transaction) Event {
-	// Broadcast the request to the network, in case we're in the wrong view
-	op.mux.Post(core.TxPbftEvent{Tx: tx})
 
+	logger.Infof("view id : %d; node id : %d", op.pbft.view, op.pbft.id)
 	if op.pbft.primary(op.pbft.view) == op.pbft.id && op.pbft.activeView {
+		logger.Infof("find primary node")
 		return op.leaderProcReq(op.txToReq(tx))
 	}
 

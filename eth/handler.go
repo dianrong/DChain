@@ -741,7 +741,16 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 
 	case msg.Code == PbftPrePrepareMsg:
-		//TODO: call pbft module
+
+		var preprepare *types.PrePrepare
+		if err := msg.Decode(&preprepare); err != nil {
+			return errResp(ErrDecode, "msg %v: %v", msg, err)
+		}
+
+		pm.pbft.RecvMsg(&types.Message{
+			Type: types.Message_CONSENSUS,
+			Prerepare:   preprepare,
+		})
 
 	default:
 		return errResp(ErrInvalidMsgCode, "%v", msg.Code)

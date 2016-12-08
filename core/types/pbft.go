@@ -62,8 +62,9 @@ const (
 )
 
 type Message struct {
-	Type Message_Type
-	Tx   *Transaction
+	Type 		Message_Type
+	Tx   		*Transaction
+	Prerepare	*PrePrepare
 }
 
 type Request struct {
