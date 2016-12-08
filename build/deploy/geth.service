@@ -1,0 +1,9 @@
+[Unit]
+Description=Start geth
+Requires=network.target
+[Service]
+Type=simple
+ExecStart=/bin/sh -c "cd /root/blockchain && sh ./scripts/runGeth.sh"
+Restart=on-failure
+[Install]
+WantedBy=default.target
