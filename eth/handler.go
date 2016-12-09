@@ -81,10 +81,11 @@ type ProtocolManager struct {
 	SubProtocols []p2p.Protocol
 	pbft	     pbft.Consenter
 
-	eventMux      *event.TypeMux
-	txSub         event.Subscription
-	minedBlockSub event.Subscription
-	txPbftSub     event.Subscription
+	eventMux      		*event.TypeMux
+	txSub         		event.Subscription
+	minedBlockSub 		event.Subscription
+	txPbftSub     		event.Subscription
+	prePrepareSub    	event.Subscription
 
 	// channels for fetcher, syncer, txsyncLoop
 	newPeerCh   chan *peer
@@ -235,6 +236,9 @@ func (pm *ProtocolManager) Start() {
 		} else if viper.GetString("consensus.algorithm") == "PBFT" {
 			pm.txPbftSub = pm.eventMux.Subscribe(core.TxPbftEvent{})
 			go pm.txPbftBroadcastLoop()
+
+			pm.prePrepareSub = pm.eventMux.Subscribe(core.PrePreparePbftEvent{})
+			go pm.prePrepareBroadcastLoop()
 		}
 	}
 
@@ -730,11 +734,23 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		for _, tx := range txs {
 			glog.V(logger.Debug).Infof("Get tx: %d", tx.Value())
 
-			pm.pbft.RecvMsg(&pbft.Message{
-				Type: pbft.Message_CONSENSUS,
+			pm.pbft.RecvMsg(&types.Message{
+				Type: types.Message_CONSENSUS,
 				Tx:   tx,
 			})
 		}
+
+	case msg.Code == PbftPrePrepareMsg:
+
+		var preprepare *types.PrePrepare
+		if err := msg.Decode(&preprepare); err != nil {
+			return errResp(ErrDecode, "msg %v: %v", msg, err)
+		}
+
+		pm.pbft.RecvMsg(&types.Message{
+			Type: types.Message_CONSENSUS,
+			Prerepare:   preprepare,
+		})
 
 	default:
 		return errResp(ErrInvalidMsgCode, "%v", msg.Code)
@@ -794,6 +810,14 @@ func (pm *ProtocolManager) PbftBroadcastTx(tx *types.Transaction) {
 	glog.V(logger.Detail).Infoln("broadcast pbft tx to", pm.peers.Len(), "peers")
 }
 
+func (pm *ProtocolManager) PbftBroadcastPre(preprepare *types.PrePrepare) {
+
+	for _, peer := range pm.peers.peers {
+		peer.SendPbftPrePrepare(preprepare)
+	}
+	glog.V(logger.Detail).Infoln("broadcast pbft tx to", pm.peers.Len(), "peers")
+}
+
 // Mined broadcast loop
 func (self *ProtocolManager) minedBroadcastLoop() {
 	// automatically stops if unsubscribe
@@ -812,6 +836,15 @@ func (self *ProtocolManager) txPbftBroadcastLoop() {
 
 		fmt.Println("Handl transaction : data - %d;  value - %d", event.Tx.Data(), event.Tx.Value())
 		self.PbftBroadcastTx(event.Tx)
+	}
+}
+
+func (self *ProtocolManager) prePrepareBroadcastLoop() {
+	for obj := range self.prePrepareSub.Chan() {
+		event := obj.Data.(core.PrePreparePbftEvent)
+
+		fmt.Println("Handl transaction : data - %d;  value - %s", event, event.Pre.BatchDigest)
+		self.PbftBroadcastPre(event.Pre)
 	}
 }
 

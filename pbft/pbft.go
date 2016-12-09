@@ -8,41 +8,26 @@ import (
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 type Consenter interface {
-	RecvMsg(*Message) error // Called serially with incoming messages from gRPC
+	RecvMsg(*types.Message) error // Called serially with incoming messages from gRPC
 }
 
-type Message_Type int32
 
-const (
-	Message_UNDEFINED               Message_Type = 0
-	Message_DISC_HELLO              Message_Type = 1
-	Message_DISC_DISCONNECT         Message_Type = 2
-	Message_DISC_GET_PEERS          Message_Type = 3
-	Message_DISC_PEERS              Message_Type = 4
-	Message_DISC_NEWMSG             Message_Type = 5
-	Message_CHAIN_TRANSACTION       Message_Type = 6
-	Message_SYNC_GET_BLOCKS         Message_Type = 11
-	Message_SYNC_BLOCKS             Message_Type = 12
-	Message_SYNC_BLOCK_ADDED        Message_Type = 13
-	Message_SYNC_STATE_GET_SNAPSHOT Message_Type = 14
-	Message_SYNC_STATE_SNAPSHOT     Message_Type = 15
-	Message_SYNC_STATE_GET_DELTAS   Message_Type = 16
-	Message_SYNC_STATE_DELTAS       Message_Type = 17
-	Message_RESPONSE                Message_Type = 20
-	Message_CONSENSUS               Message_Type = 21
-)
-
-type Message struct {
-	Type Message_Type
-	Tx   *types.Transaction
+type msgID struct { // our index through certStore
+	v uint32
+	n uint32
 }
 
-type Request struct {
-	Timestamp time.Time
-	Msg       Message
+type msgCert struct {
+	digest      common.Hash
+	prePrepare  *types.PrePrepare
+	sentPrepare bool
+	prepare     []*types.Prepare
+	sentCommit  bool
+	commit      []*types.Commit
 }
 
 type pbftCore struct {
@@ -53,28 +38,29 @@ type pbftCore struct {
 	idleChan   chan struct{} // Used to detect idleness for testing
 	injectChan chan func()   // Used as a hack to inject work onto the PBFT thread, to be removed eventually
 
-						       // PBFT data
+	mux	*event.TypeMux
+
 	activeView    bool              // view change happening
 	byzantine     bool              // whether this node is intentionally acting as Byzantine; useful for debugging on the testnet
 	f             uint32               // max. number of faults we can tolerate
 	N             uint32               // max.number of validators in the network
-	h             uint64            // low watermark
+	h             uint32            // low watermark
 	id            uint32            // replica ID; PBFT `i`
-	K             uint64            // checkpoint period
-	logMultiplier uint64            // use this value to calculate log size : k*logMultiplier
-	L             uint64            // log size
-	lastExec      uint64            // last request we executed
+	K             uint32            // checkpoint period
+	logMultiplier uint32            // use this value to calculate log size : k*logMultiplier
+	L             uint32            // log size
+	lastExec      uint32            // last request we executed
 	replicaCount  uint32               // number of replicas; PBFT `|R|`
-	seqNo         uint64            // PBFT "n", strictly monotonic increasing sequence number
-	view          uint64            // current view
-	chkpts        map[uint64]string // state checkpoints; map lastExec to global hash
+	seqNo         uint32            // PBFT "n", strictly monotonic increasing sequence number
+	view          uint32            // current view
+	chkpts        map[uint32]string // state checkpoints; map lastExec to global hash
 
 
 	skipInProgress    bool               // Set when we have detected a fall behind scenario until we pick a new starting point
 	stateTransferring bool               // Set when state transfer is executing
-	hChkpts           map[uint64]uint64  // highest checkpoint sequence number observed for each replica
+	hChkpts           map[uint32]uint32  // highest checkpoint sequence number observed for each replica
 
-	currentExec           *uint64                  // currently executing request
+	currentExec           *uint32                  // currently executing request
 	timerActive           bool                     // is the timer running?
 	//vcResendTimer         events.Timer             // timer triggering resend of a view change
 	//newViewTimer          events.Timer             // timeout triggering a view change
@@ -84,18 +70,18 @@ type pbftCore struct {
 	newViewTimerReason    string                   // what triggered the timer
 	lastNewViewTimeout    time.Duration            // last timeout we used during this view change
 	broadcastTimeout      time.Duration            // progress timeout for broadcast
-	//outstandingReqBatches map[string]*RequestBatch // track whether we are waiting for request batches to execute
+	outstandingReqBatches map[common.Hash]*types.RequestBatch // track whether we are waiting for request batches to execute
 
 	//nullRequestTimer   events.Timer  // timeout triggering a null request
 	nullRequestTimeout time.Duration // duration for this timeout
-	viewChangePeriod   uint64        // period between automatic view changes
-	viewChangeSeqNo    uint64        // next seqNo to perform view change
+	viewChangePeriod   uint32        // period between automatic view changes
+	viewChangeSeqNo    uint32        // next seqNo to perform view change
 
-	missingReqBatches map[string]bool // for all the assigned, non-checkpointed request batches we might be missing during view-change
+	missingReqBatches map[common.Hash]bool // for all the assigned, non-checkpointed request batches we might be missing during view-change
 
 	// implementation of PBFT `in`
-	//reqBatchStore   map[string]*RequestBatch // track request batches
-	//certStore       map[msgID]*msgCert       // track quorum certificates for requests
+	reqBatchStore   map[common.Hash]*types.RequestBatch // track request batches
+	certStore       map[msgID]*msgCert       // track quorum certificates for requests
 	//checkpointStore map[Checkpoint]bool      // track checkpoints as set
 	//viewChangeStore map[vcidx]*ViewChange    // track view-change messages
 	//newViewStore    map[uint64]*NewView      // track last new-view we received or sent
@@ -105,12 +91,13 @@ func New(mux *event.TypeMux, peerId uint32, peerCount uint32) Consenter {
 	return newObcBatch(mux, peerId, peerCount)
 }
 
-func newPbftCore(peerId uint32, peerCount uint32) *pbftCore {
+func newPbftCore(peerId uint32, peerCount uint32, mux *event.TypeMux) *pbftCore {
 	var err error
 	instance := &pbftCore{}
 	instance.id = peerId
 	instance.replicaCount = peerCount
 
+	instance.mux = mux
 	//instance.consumer = consumer
 	//
 	//instance.newViewTimer = etf.CreateTimer()
@@ -123,14 +110,14 @@ func newPbftCore(peerId uint32, peerCount uint32) *pbftCore {
 		panic(fmt.Sprintf("need at least %d enough replicas to tolerate %d byzantine faults, but only %d replicas viperured", instance.f*3+1, instance.f, instance.N))
 	}
 
-	instance.K = uint64(viper.GetInt("consensus.K"))
+	instance.K = uint32(viper.GetInt("consensus.K"))
 
-	instance.logMultiplier = uint64(viper.GetInt("consensus.logmultiplier"))
+	instance.logMultiplier = uint32(viper.GetInt("consensus.logmultiplier"))
 	if instance.logMultiplier < 2 {
 		panic("Log multiplier must be greater than or equal to 2")
 	}
 	instance.L = instance.logMultiplier * instance.K // log size
-	instance.viewChangePeriod = uint64(viper.GetInt("consensus.viewchangeperiod"))
+	instance.viewChangePeriod = uint32(viper.GetInt("consensus.viewchangeperiod"))
 
 	instance.byzantine = viper.GetBool("consensus.byzantine")
 
@@ -181,7 +168,7 @@ func newPbftCore(peerId uint32, peerCount uint32) *pbftCore {
 
 	// init the logs
 	//instance.certStore = make(map[msgID]*msgCert)
-	//instance.reqBatchStore = make(map[string]*RequestBatch)
+	instance.reqBatchStore = make(map[common.Hash]*types.RequestBatch)
 	//instance.checkpointStore = make(map[Checkpoint]bool)
 	//instance.chkpts = make(map[uint64]string)
 	//instance.viewChangeStore = make(map[vcidx]*ViewChange)
@@ -195,9 +182,9 @@ func newPbftCore(peerId uint32, peerCount uint32) *pbftCore {
 	//instance.chkpts[0] = "XXX GENESIS"
 	//
 	//instance.lastNewViewTimeout = instance.newViewTimeout
-	//instance.outstandingReqBatches = make(map[string]*RequestBatch)
-	//instance.missingReqBatches = make(map[string]bool)
-	//
+	instance.outstandingReqBatches = make(map[common.Hash]*types.RequestBatch)
+	instance.missingReqBatches = make(map[common.Hash]bool)
+
 	//instance.restoreState()
 	//
 	//instance.viewChangeSeqNo = ^uint64(0) // infinity
@@ -211,7 +198,8 @@ func (instance *pbftCore) ProcessEvent(e Event) Event {
 	var err error
 	logger.Debugf("Replica %d processing event", instance.id)
 	switch et := e.(type) {
-
+	case *types.RequestBatch:
+		err = instance.recvRequestBatch(et)
 	default:
 		logger.Warningf("Replica %d received an unknown message type %T", instance.id, et)
 	}
@@ -223,3 +211,95 @@ func (instance *pbftCore) ProcessEvent(e Event) Event {
 	return nil
 }
 
+// Given a certain view n, what is the expected primary?
+func (instance *pbftCore) primary(n uint32) uint32 {
+	return n % uint32(instance.replicaCount)
+}
+
+// Is the sequence number between watermarks?
+func (instance *pbftCore) inW(n uint32) bool {
+	return n-instance.h > 0 && n-instance.h <= instance.L
+}
+
+// Is the view right? And is the sequence number between watermarks?
+func (instance *pbftCore) inWV(v uint32, n uint32) bool {
+	return instance.view == v && instance.inW(n)
+}
+
+// Given a digest/view/seq, is there an entry in the certLog?
+// If so, return it. If not, create it.
+func (instance *pbftCore) getCert(v uint32, n uint32) (cert *msgCert) {
+	idx := msgID{v, n}
+	cert, ok := instance.certStore[idx]
+	if ok {
+		return
+	}
+
+	cert = &msgCert{}
+	instance.certStore[idx] = cert
+	return
+}
+
+func (instance *pbftCore) recvRequestBatch(reqBatch *types.RequestBatch) error {
+	digest, err := hash(reqBatch)
+	if err != nil {
+		return err
+	}
+
+	logger.Debugf("Replica %d received request batch %s", instance.id, digest)
+
+	instance.reqBatchStore[digest] = reqBatch
+	instance.outstandingReqBatches[digest] = reqBatch
+	//instance.persistRequestBatch(digest)
+
+	if instance.primary(instance.view) == instance.id && instance.activeView {
+		instance.sendPrePrepare(reqBatch, digest)
+	} else {
+		logger.Debugf("Replica %d is backup, not sending pre-prepare for request batch %s", instance.id, digest)
+	}
+	return nil
+}
+
+func (instance *pbftCore) sendPrePrepare(reqBatch *types.RequestBatch, digest common.Hash) {
+	logger.Debugf("Replica %d is primary, issuing pre-prepare for request batch %s", instance.id, digest)
+
+	n := instance.seqNo + 1
+	for _, cert := range instance.certStore { // check for other PRE-PREPARE for same digest, but different seqNo
+		if p := cert.prePrepare; p != nil {
+			if p.View == instance.view && p.SequenceNumber != n && p.BatchDigest == digest && digest.Str() != "" {
+				logger.Infof("Other pre-prepare found with same digest but different seqNo: %d instead of %d", p.SequenceNumber, n)
+				return
+			}
+		}
+	}
+
+	if !instance.inWV(instance.view, n) || n > instance.h+instance.L/2 {
+		// We don't have the necessary stable certificates to advance our watermarks
+		logger.Warningf("Primary %d not sending pre-prepare for batch %s - out of sequence numbers", instance.id, digest)
+		return
+	}
+
+	if n > instance.viewChangeSeqNo {
+		logger.Info("Primary %d about to switch to next primary, not sending pre-prepare with seqno=%d", instance.id, n)
+		return
+	}
+
+	logger.Debugf("Primary %d broadcasting pre-prepare for view=%d/seqNo=%d and digest %s", instance.id, instance.view, n, digest)
+	instance.seqNo = n
+	preprep := &types.PrePrepare{
+		View:           instance.view,
+		SequenceNumber: n,
+		BatchDigest:    digest,
+		RequestBatch:   reqBatch,
+		ReplicaId:      instance.id,
+	}
+	cert := instance.getCert(instance.view, n)
+	cert.prePrepare = preprep
+	cert.digest = digest
+	//instance.persistQSet()
+
+	// Broadcast the request to the network, in case we're in the wrong view
+	instance.mux.Post(preprep)
+
+	//instance.maybeSendCommit(digest, instance.view, n)
+}

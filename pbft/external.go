@@ -1,5 +1,7 @@
 package pbft
 
+import "github.com/ethereum/go-ethereum/core/types"
+
 
 // commitedEvent is sent when a requested commit completes
 type committedEvent struct {
@@ -14,10 +16,11 @@ type externalEventReceiver struct {
 }
 
 // RecvMsg is called by the stack when a new message is received
-func (eer *externalEventReceiver) RecvMsg(msg *Message) error {
+func (eer *externalEventReceiver) RecvMsg(msg *types.Message) error {
 	logger.Infof("RecvMsg external.go")
-	eer.manager.Queue() <- batchMessageEvent{
-		msg: msg,
+
+	eer.manager.Queue() <- types.BatchMessageEvent{
+		Msg: msg,
 	}
 	return nil
 }

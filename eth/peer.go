@@ -146,6 +146,11 @@ func (p *peer) SendPbftTransaction(txs types.Transactions) error {
 	return p2p.Send(p.rw, PbftTxMsg, txs)
 }
 
+func (p *peer) SendPbftPrePrepare(preprepare *types.PrePrepare) error {
+	fmt.Println("send pbft preprepare to peer : " + p.id)
+	return p2p.Send(p.rw, PbftPrePrepareMsg, preprepare)
+}
+
 // SendNewBlockHashes announces the availability of a number of blocks through
 // a hash notification.
 func (p *peer) SendNewBlockHashes(hashes []common.Hash, numbers []uint64) error {

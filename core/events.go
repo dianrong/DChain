@@ -32,6 +32,8 @@ type TxPostEvent struct{ Tx *types.Transaction }
 
 type TxPbftEvent struct{ Tx *types.Transaction }
 
+type PrePreparePbftEvent struct{ Pre *types.PrePrepare }
+
 // PendingLogsEvent is posted pre mining and notifies of pending logs.
 type PendingLogsEvent struct {
 	Logs vm.Logs
