@@ -39,3 +39,5 @@ profile.cov
 
 .idea/
 go-ethereum.iml
+*.plist
+

@@ -294,8 +294,6 @@ func (p *peer) readStatus(network int, status *statusData, genesis common.Hash, 
 	if status.GenesisBlock != genesis {
 		return errResp(ErrGenesisBlockMismatch, "%x (!= %x)", status.GenesisBlock, genesis)
 	}
-	fmt.Println(status.ConfigMsg)
-	fmt.Println(configHash)
 	if status.ConfigMsg != configHash {
 		return errResp(ErrConfigMsgMismatch, "%x (!= %x)", status.ConfigMsg, configHash)
 	}
