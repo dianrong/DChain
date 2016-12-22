@@ -1,3 +1,10 @@
+// Copyright Dianrong.com Corp. 2016 All Rights Reserved.
+//
+// The Roc is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
 package pbft
 
 import "github.com/ethereum/go-ethereum/core/types"
