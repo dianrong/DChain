@@ -1,8 +1,8 @@
 
 
-## Roc
+## DChain
 
-Roc is an Ethereum-based blockchain platform with permission control and configurable consensus mechanism.
+DChain is an Ethereum-based blockchain platform with permission control and configurable consensus mechanism.
 
 ## Features
 
@@ -57,7 +57,7 @@ Thank you for considering to help out with the source code! We welcome contribut
 
 ## License
 
-The Roc project is licensed under the
+The DChain project is licensed under the
 [GNU General Public License v3.0], also included
 in our repository in the `COPYING` file.
 
